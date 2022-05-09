@@ -1,0 +1,718 @@
+function gettrialorder(subject, sessnum)
+%get trial order for all types of trials to know trial history for each
+%trial, output table with ts' of outcome period for all trials, trial type,
+%and category trial label (eg. big trial 105)
+%check if the sync errors discovered 03/1/2019 exist in files based on
+%events loaded in nlx and da files, if exist run syncsig again and all
+%processsing functions otherwise events don't line up appropriately
+log=[];
+subjectname='patra';
+if strcmp(subject,'cleo')
+    subjectname='cleo';
+end
+sessid='';
+if ~isnumeric(sessnum)
+    sessid=sessnum;
+else
+    sessid=num2str(sessnum);
+end
+%save path in separate directory from data
+pctype=computer;
+ispc=strcmpi(pctype,'pcwin64');
+homedir='Z:';
+if ~ispc
+    homedir=[filesep];
+end
+graserver='inj-monkey2';
+fscvdir='patra_fscv2';
+analysispath=fullfile(homedir,graserver,'analysis',subjectname,['chronic' num2str(sessnum)],filesep);
+if ~isdir(analysispath)
+    mkdir(analysispath);
+end
+%default on putamen pc in lab, get data directory from config file
+configdir='A:\mit\injectrode\experiments\fscv\matlab\analysis\analysis\config\';
+if ~ispc
+    %chunky dir
+    configdir=fullfile(filesep,'home','schwerdt','matlab','analysis','analysis','config',filesep);
+end
+ncschannels={};
+csc_map={};
+paths={};
+event_codes={};
+switch subjectname
+    case 'patra'
+        run([configdir ['chronic' sessid 'chconfig.m']]);        %get 'paths'
+        run([configdir 'patra_map_bipolar.m']);      %get csc_map
+    case 'cleo'
+        run([configdir ['cleo_chronic' sessid '.m']]);        %get 'paths'
+        run([configdir ['cleo_map_bipolar' sessid '.m']]);      %get csc_map & event_codes
+end
+
+ncschannels={'eyex'};
+
+%selectcsc=cscchs;
+alignname='';
+
+aligns={'bigreward','smallreward','targetbreak','fixbreak'};
+
+cleolickflag=0;
+[fscvSyncTTL, nlxSyncID, alignmentIDs]=getAlign(alignname);
+%fscvSyncTTL/nlsSyncID is universal sync event trigger between nlx & fscv independent
+%of behavioral alignment event
+selectcsc=33;
+lfpchs=[];
+otherchs=[];
+if ~isempty(csc_map)
+if cleolickflag==0
+    [lfpchs,bipolarchs,otherchs,sumchs]=getcscids(ncschannels,csc_map);
+else
+    [lfpchs,bipolarchs,otherchs,sumchs]=getcscids(ncschannels,csc_map,'cleolick37');
+end
+selectcsc=[otherchs];        %just get eye signals
+end
+%otherCh=[33:35,39:41,42];   %eye, lick, pulse
+%selectcsc=[lfpchs otherchs];        %just get eye signals
+
+%selectcsc=[33:35];          %nlx channels that want to store, only eye
+preOffset=30;           %seconds from event ID to align to
+durationTrial=60;       %seconds duration of file past start trial index, if zero, then up to next trial event
+fscvRate=10;            %fscv sampling rate
+
+%get fscv file names from defined path
+dirfscv=dir([paths{1} '*_cvtotxt']);       %get cvtotxt files in path
+filesfscv={dirfscv.name};
+pathfscv=paths{1};
+sep=findstr(filesep,pathfscv);      %indexes of separator '\' or '/' in pathname
+
+%get events file from path{2}
+direvents=dir([paths{2} '*.nev']);
+fileevents=[paths{2} direvents.name];       %get events file name
+%load neuralynx events file (mat converted from dg_nlx2mat.m
+%load dg_Nlx2Mat_EventStrings, dg_Nlx2Mat_Timestamps, dg_Nlx2Mat_TTL
+dg_Nlx2Mat(fileevents); 
+load([[fileevents(1:end-4)] '.mat']);
+nlx_ts=dg_Nlx2Mat_Timestamps.*1e-6;      %convert to sec (timestamps for events)
+
+%load lfp samples & eye data
+pathnlx=paths{2};
+sep2=findstr(filesep,pathnlx);
+[samples, nlxFileNames, TS]=ephys_getCSC(selectcsc,pathnlx);
+%TS here is vector nlx timestamps in seconds
+ratelfp=getSampleRate(TS);
+
+Iread=[];
+fscvStartTrialTS=[];        %fscv domain TS of cheetah start TTLs
+%find first file & only include text files for each channel
+%find first recording in sequence (ie. 100)
+%ispresent=contains(filesfscv,'100_cvtotxt','IgnoreCase',true);
+%contains does not work in 2013 version matlab
+ispresent=strfind(filesfscv,'100_cvtotxt');     %case-sensitive
+firstFileIDs=find(~cellfun(@isempty,ispresent));
+%contains function does not work for 2013 for cells 
+%files=filenames(processfiles);
+if isempty(firstFileIDs)
+    warning('file with 100 not found, finding 200 for first idx file');
+    %maybe first file named was 200, check
+   % ispresent=contains(files,'200_cvtotxt','IgnoreCase',true);
+    ispresent=strfind(filesfscv,'200_cvtotxt');
+    firstFileIDs=find(~cellfun(@isempty,ispresent));
+    %firstFileIDs=find(ispresent>0);
+end
+firstFileName=filesfscv{1};
+%check to make sure this first file in list is also the first channel
+%default naming convention is '0_1dr_xx_100_cvtotxt'
+correspondsCh0=regexpi(firstFileName,'0_');
+firstch=0;      %default 1st channel for 4 channel fscv recording
+if correspondsCh0(1)~=1
+    warning('first channel not included');
+    if find(regexpi(firstFileName,'\d')==1)
+        %check that first character of name is a number corresponding to ch
+        firstch=str2num(firstFileName(1));  %get first ch #
+        display(['first fscv ch is #' num2str(firstch)]);
+    else
+        error('incorrect naming or format of fscv cvtotxt files')
+    end
+        
+end
+savefolder=fullfile(pathfscv,'matlab',filesep);
+if ~isdir(savefolder)
+    status = mkdir(savefolder);
+end
+
+
+%% get filenames
+%firstChannelFiles=contains(filesfscv,[num2str(firstch) '_1dr'],'IgnoreCase',true);
+firstChannelFiles=strfind(filesfscv,[num2str(firstch) '_1dr']);
+fileNamesids=find(~cellfun(@isempty,firstChannelFiles));
+fileNames=filesfscv(fileNamesids);
+%fileNames=filesfscv(firstChannelFiles>0);       %cvtotxt files of 1st channel only
+arrayedFiles =vertcat(fileNames{:});        %only works when length of strings same
+arrayedNames=arrayedFiles;
+endNameIdx=regexpi(arrayedNames(1,:),'_cvtotxt');
+targetNames=arrayedNames(:,3:endNameIdx-1);     %name without channel #
+endName=arrayedNames(1,endNameIdx:end);
+fileNums=targetNames(:,end-2:end);
+%file #'s of continuous fscv recordings, should start from 100 typically
+fileNums2=str2num(fileNums);            
+
+%sort filenames
+[sorted,sortID]=sort(fileNums2,'ascend');
+sortedNames=targetNames(sortID,:);
+
+%check if already sorted (not really needed..)
+xx=sorted-fileNums2;
+if sum(xx)==0
+    display('names already sorted as loaded');
+end
+
+%get .txt files up one directory with TTls from neuralynx
+pathNameUp=pathfscv(1:sep(end-1));      %directory with fscv ttl files
+
+fscvEvents=[];
+%load and concatenate .txt files containing TTLs from cheetah/vcortex
+disp('concatenating fscv TTL files');
+lastTS=0;
+for fileidx=1:size(sortedNames,1)
+    %load txt file with fscv ttls
+    txtLoad=load([pathNameUp sortedNames(fileidx,:) '.txt']);
+    
+    %store in fscvEvents
+    if isempty(fscvEvents)
+        fscvEvents=txtLoad;
+    else
+        %shift TS's upward depending on last TS recorded from last file
+        % and fscv time interval (eg. 1/fscvRate)
+        txtLoad2=txtLoad;
+        txtLoad2(:,1)=txtLoad2(:,1)+lastTS+1/fscvRate;
+        fscvEvents=[fscvEvents; txtLoad2];
+    end
+    
+    %get last recorded TS for this file
+    lastTS=fscvEvents(end,1);
+end
+disp(['recorded ' num2str(lastTS/60/60) ' hours']);
+writelog=['recorded ' num2str(lastTS/60/60) ' hours'];
+%record in log file
+if isempty(log)
+    log=writelog;
+else
+    log=[log sprintf('\n') writelog];
+end
+%Find fscv data point when TTL goes to 241 in FSCV, corresponding to Nlx first trigger
+fscvTTLIdx=find(fscvEvents(:,3)==fscvSyncTTL);  % get TTL on Ids
+fscvTTLTS=fscvEvents(fscvTTLIdx,1);         %get fscv TS of TTL on periods
+%nlx_ts is the timestamps of all TTL's inputted/outputted in Neuralynx
+%actual TTL values in dg_Nlx2Mat_TTL. Neuralynx has much faster sampling 
+%rate but only generates # once so the first encoded TS in Neuralynx for 
+%outputted TTL represents several successive TTL TS's in fscvEvents FSCV 
+%TSs (since TTL is several hundred ms long)
+
+%find Nlx IDs when evt signals alignment ID for trigger
+idsTrigNlx=find(dg_Nlx2Mat_TTL==nlxSyncID);   
+trigNlxTTLTS=nlx_ts(idsTrigNlx);        %convert NLx data point to Nlx TS
+
+%calculate time difference between Nlx first TTL TS (ie. cheetah time base)
+% and fscv first TTL TS (ie. fscv time base)
+fscvToNlxOffset=trigNlxTTLTS(1)-fscvTTLTS(1);
+fscvNlxEvents=fscvEvents;       
+%fscvNlxEvents has timestamps for fscv signals and cheetah events
+%create same events file with fscv TS shifted to synchronize with Neuralynx TS
+%fscvNlxEvents(:,1)=fscvEvents(:,1)+fscvToNlxOffset;
+%remove successive TTL's (ie. hold period) in fscv TTLs corresponding 
+%to same sync ttl pulse from nlx (~ 200 - 300 ms?, so repeated 2 - 3 times)
+%to make sure same amount of TTL's in cheetah, can check delays
+fscvTTLIdxCompressed=[];
+IDcount=1;
+previdx=-1;
+for idx=1:length(fscvTTLIdx)
+    if fscvTTLIdx(idx)-1~=previdx
+        fscvTTLIdxCompressed(IDcount)=fscvTTLIdx(idx);
+        IDcount=IDcount+1;
+    end
+    previdx=fscvTTLIdx(idx);
+end
+%get fscv TS of TTL compressed IDs  matching length of idsTrigNlx
+syncfscvTTLTS=fscvNlxEvents(fscvTTLIdxCompressed,1);    
+if length(syncfscvTTLTS)~=length(idsTrigNlx)
+    warning('length of TTLs activated in fscv do not match TTLs in Nlx')
+    writelog=['length of TTLs activated in fscv do not match TTLs in Nlx'];
+    %record in log file
+    log=[log sprintf('\n') writelog];
+
+
+    %check if period between first two ttl's match for fscv/nlx systems
+    interinterval_fscv=syncfscvTTLTS(2)-syncfscvTTLTS(1);
+    interinterval_nlx=trigNlxTTLTS(2)-trigNlxTTLTS(1);
+    %3/1/2019, add checks for making sure signal events aligned, based on
+    %errors in cleo fscv 17, 20 lines below added
+    difffscv=diff(syncfscvTTLTS');
+    diffnlx=diff(trigNlxTTLTS);
+    difffscv2=difffscv(1:min(length(difffscv),length(diffnlx)));
+    diffnlx2=diffnlx(1:min(length(difffscv),length(diffnlx)));
+    difboth=difffscv2-diffnlx2;
+    [r,p]=corr(difffscv2',diffnlx2');           %correlatiosn betweetn intervals between both
+    obstaclefound=find(abs(difboth)>5);     %discrepancy between interinterval of fscv ttl's and nlx ttl's > 5 s (1 s maybe understandable for prolonged breaks)
+    if length(obstaclefound)>10 && r<0.95
+        %will create multiple insychronies afterwards
+        %def marker of something wrong
+        if length(idsTrigNlx)>length(fscvTTLIdxCompressed)  
+            disp('nlx trig events more than fscv events captured')
+            writelog=['nlx trig events more than fscv events captured, saving -trigts- of nlx and fscv-synced..'];
+            save([savefolder 'trigts'],'syncfscvTTLTS','trigNlxTTLTS');
+            %record in log file
+            log=[log sprintf('\n') writelog];
+            diffnlx3=diffnlx;
+            diffnlx3(obstaclefound(1))=[];      %remove proble nlx ts trigger that was not captured in fscv & make sure signal events now aligned based on corr below
+            [r,p]=corr(difffscv2',diffnlx3');
+            if r>0.95
+                disp(['removing obstacle at ' num2str(obstaclefound(1)) ' trigger #'])
+                 writelog=['removing obstacle at ' num2str(obstaclefound(1)) ' trigger #'];
+                %record in log file
+                log=[log sprintf('\n') writelog];
+                %if removal of obstalce restores signal alignments                
+                idsTrigNlx(obstaclefound(1))=[];        %remove problem nlx trigger that was not captured in fscv
+                trigNlxTTLTS=nlx_ts(idsTrigNlx);
+                interinterval_nlx=trigNlxTTLTS(2)-trigNlxTTLTS(1);
+                if length(syncfscvTTLTS)==length(idsTrigNlx)
+                    disp(['length of triggers equal, fscv ttls = ' num2str(length(syncfscvTTLTS)) ...
+                        ', nlx ttls = ' num2str(length(idsTrigNlx))]);
+                    writelog=['length of triggers equal, fscv ttls = ' num2str(length(syncfscvTTLTS)) ...
+                        ', nlx ttls = ' num2str(length(idsTrigNlx)) ' saving -trigts_obsrem-...'];
+                    save([savefolder 'trigts_obsrem'],'syncfscvTTLTS','trigNlxTTLTS');
+                    %record in log file
+                    log=[log sprintf('\n') writelog];
+                end
+            end
+        else
+            warning('fscv trig events more than nlx events triggered, nothing to do, need to manually fix');
+            writelog=['fscv trig events more than nlx events triggered, nothing to do, need to manually fix'];
+            %record in log file
+            log=[log sprintf('\n') writelog];
+        end
+    end
+    if abs(interinterval_fscv-interinterval_nlx)>0.2
+        warning(['discrepancy between period from trial 1 to trial 2 for 2 systems is > 0.2 s = ' num2str(abs(interinterval_fscv-interinterval_nlx))]);
+        writelog=['discrepancy between period from trial 1 to trial 2 for 2 systems is > 0.2 s = ' num2str(abs(interinterval_fscv-interinterval_nlx))];
+        %record in log file
+        log=[log sprintf('\n') writelog];
+    end    
+end
+%Because of slow fscv sampling rate & long pulse can be large discrepancy
+%between TTL TS's since fscv system has inherent delay that gets progressively
+%larger as recording continues.....................longer.............
+%Therefore, Nlx referred TS's created in fscvNlxEvents are useless
+%need to refer each TTL in fscv itself to corresponding TTL in nlx to
+%synchronize trial task events accurately
+%% 
+%now incorporate NLx events into fscvEvents around each sync trigger TTL
+%as well as nonlinear merged time Nlx TS's
+fscvNlxEvents(10,12)=0;     %expand to have 10 columns (ie 5 columns for events)
+eventsininterval=[];
+eventspreinterval=[];
+eventsinterval=[];
+%scan at each triggered FSCV TTL
+for ii=1:length(fscvTTLIdxCompressed)
+    %get # of events encoded in Nlx between trials
+    %events (idxs) from current trigger to preOffset period prior 
+    eventspreinterval=find(nlx_ts...
+        <=nlx_ts(idsTrigNlx(ii))-preOffset);
+    if ~isempty(eventspreinterval)
+        eventspreinterval=eventspreinterval(end):(idsTrigNlx(ii)-1);
+    else
+        eventspreinterval=1:(idsTrigNlx(ii)-1);
+    end
+    %events (idxs) from current trigger until next trigger
+    if ii~=length(idsTrigNlx)
+        eventspostinterval=idsTrigNlx(ii):(idsTrigNlx(ii+1));  
+    else
+        eventspostinterval=idsTrigNlx(ii):length(dg_Nlx2Mat_TTL);
+    end
+    %eventspreinterval redundant unless > preOffset period since last
+    %trigger (duration that could produce mismatch) or first trigger
+    timelasttrigger=60;
+    if ii~=1
+        timelasttrigger=nlx_ts(idsTrigNlx(ii))-...
+            nlx_ts(idsTrigNlx(ii-1));
+    end
+    if timelasttrigger>preOffset && ii~=1
+        %only use preinterval events if long delay between triggers
+        eventsinterval=[eventspreinterval eventspostinterval];
+    else
+        %otherwise only use post events
+        eventsinterval=eventspostinterval;
+    end
+    if ii==1
+        %if first trigge,r get everything before
+        eventsinterval=[eventspreinterval eventspostinterval];
+    end
+    %get range of nlx TS's between trigger intervals
+    firstTS=nlx_ts(eventsinterval(1)); 
+    lastTS=nlx_ts(eventsinterval(end));
+    %get reference idx of start TTL trigger in fscv
+    reffscvID=fscvTTLIdxCompressed(ii);     %first idx of trigger in fscv
+    refNlxTS=nlx_ts(idsTrigNlx(ii));     %Nlx TS of trigger
+    %get firstTS id relative to fscv trigger
+    td=firstTS-refNlxTS;        
+    tdinsamplesFSCV=round(td*fscvRate);        %convert to FSCV samples
+    firstTSfscvIDx=reffscvID+tdinsamplesFSCV;
+    TSrangesamplesFSCV=round(firstTS*fscvRate):round(lastTS*fscvRate);
+    TSrangesamplesFSCV=TSrangesamplesFSCV./fscvRate;
+    %store nlx TS range in appropriate row and column 4 in fscv data
+    if firstTSfscvIDx<1
+        %event ts's in nlx before trigger may occur prior to start of fscv
+        %recording
+        TSrangesamplesFSCV=TSrangesamplesFSCV(-(firstTSfscvIDx-2):end);
+        firstTSfscvIDx=1;
+       % eventsinterval=
+    end
+    %store predicted timestamps for current interval
+    fscvNlxEvents(firstTSfscvIDx:firstTSfscvIDx+length(TSrangesamplesFSCV)-1,4)=TSrangesamplesFSCV';
+    if ii==length(fscvTTLIdxCompressed)
+        %store predicted ts's to end of fscv file
+        finalstoredidx=firstTSfscvIDx+length(TSrangesamplesFSCV)-1;
+        if finalstoredidx<size(fscvNlxEvents,1)
+            prelasttss=fscvNlxEvents(finalstoredidx,4)+1/fscvRate;
+            prelastfidx=round(prelasttss*fscvRate);
+            remaininglength=size(fscvNlxEvents,1)-finalstoredidx-1;
+            idstoend=prelastfidx:prelastfidx+remaininglength;
+            tsstoend=idstoend./fscvRate;
+            fscvNlxEvents(finalstoredidx+1:end,4)=tsstoend';
+        end
+    end
+    fscvNlxEvents(reffscvID,4)=refNlxTS;       %store Nlx TS for trigger in col 4
+    refCode=dg_Nlx2Mat_TTL(idsTrigNlx(ii));         %refCode = nlxSyncID, redundant
+    fscvNlxEvents(reffscvID,5)=refCode;          %store event id for trigger Should be 3 in col 5
+    %scan all events in trial interval encoded from nlx until next 'trial'
+    %write event codes and timestamps into fscvNlxEvents
+    %added pre trial events to preOffset period 05/01/2018
+    for jj=1:length(eventsinterval)-1
+        %get next NLX event code in interval
+        eventCodetostore=dg_Nlx2Mat_TTL(eventsinterval(jj));   
+        %get its NLX TS
+        eventTStostore=nlx_ts(eventsinterval(jj)); 
+        %calc time difference between event to store & trigger ref TS
+        td=eventTStostore-refNlxTS;        
+        tdinsamplesFSCV=round(td*fscvRate);        %convert to FSCV samples
+        %store TS of event in appropriate row and column 4
+        if reffscvID+tdinsamplesFSCV<1
+            continue
+        end
+        fscvNlxEvents(reffscvID+tdinsamplesFSCV,4)=eventTStostore;
+        %find unfilled column to store event code for given TS row
+        firstCheck=5;
+        if fscvNlxEvents(reffscvID+tdinsamplesFSCV,firstCheck)==0
+            fscvNlxEvents(reffscvID+tdinsamplesFSCV,firstCheck)=eventCodetostore;
+        else 
+        %store event code for same TS in fscvNlxEvents in another column 
+        %if targeted column already taken
+            while fscvNlxEvents(reffscvID+tdinsamplesFSCV,firstCheck)~=0 && firstCheck<10
+                firstCheck=firstCheck+1;
+            end
+            fscvNlxEvents(reffscvID+tdinsamplesFSCV,firstCheck)=eventCodetostore; 
+            %store event in empty space
+        end
+    end
+   
+    
+end        
+%%
+%repeat this section of script for different behavior alignment events
+%skipping previous sections so that do not need to reprocess csc/fscv raw
+trcount=1;
+trlist={};
+for ialign=1:length(aligns)
+    alignname=aligns{ialign};
+disp('splitting & saving data')
+disp(alignname)
+[fscvSyncTTL, nlxSyncID, alignmentIDs]=getAlign(alignname);
+
+fscvTargetTrialsIDs=[];
+nlxTargetTSs=[];
+lfp_tID=[];
+%split event data and recorded data based on specific trial event id
+indicesTXT=fscvNlxEvents(:,5:end);      %just to look at event codes
+%find fscv TS IDs of targeted event IDs
+[fscvTargetTrialsIDs,fscvStartTrialsIDs2]=find(ismember(indicesTXT, alignmentIDs )~=0);
+fscvTargetTrialsIDs=sort(fscvTargetTrialsIDs); 
+fscvTargetTrialsIDs2=fscvTargetTrialsIDs(1);
+%remove repeats
+for ii=2:length(fscvTargetTrialsIDs)
+    if fscvTargetTrialsIDs(ii)>fscvTargetTrialsIDs(ii-1)+4
+        %only include if next id is > 4 samples of previous, otherwise it is repeat
+        %03/08/18 changed from 2 samples barrier to 4 samples barrier (ie 400 ms),
+        %because event 45 is programmed to appear 200ms after 18/19 ?
+        fscvTargetTrialsIDs2=[fscvTargetTrialsIDs2 fscvTargetTrialsIDs(ii)];
+    end
+end
+fscvTargetTrialsIDs=fscvTargetTrialsIDs2;
+%find Nlx TS IDs of targeted event IDs
+%nlxTargetIDs will be bigger than fscvTarget.. because dg_Nlx2Mat is
+%searched serially whereas fscvNlxEvents combines several different
+%target IDs in a single fscv "TS" row IDx, as with redundancy above
+[nlxTargetIDs,nlxTargetIDs2]=find(ismember(dg_Nlx2Mat_TTL, alignmentIDs )~=0);
+nlxTargetIDs2=sort(nlxTargetIDs2);  nlxTargetIDs=nlxTargetIDs2(1);
+%remove repeats
+for ii=2:length(nlxTargetIDs2)
+    if nlxTargetIDs2(ii)~=nlxTargetIDs2(ii-1)+1
+        nlxTargetIDs=[nlxTargetIDs nlxTargetIDs2(ii)];
+    end
+end
+nlxTargetTSs2=nlx_ts(nlxTargetIDs);
+%get Neuralynx TS for same Target IDs directly as stored in fscvNlxEvents
+nlxTargetTSs=fscvNlxEvents(fscvTargetTrialsIDs,4);
+if length(nlxTargetIDs)~=length(fscvTargetTrialsIDs)
+    warning('# of nlx target ids does not match with fscv target ids');
+    writelog=[alignname ': # of nlx target ids does not match with fscv target ids'];
+    %record in log file
+    log=[log sprintf('\n') writelog];
+end
+discrepancy=0;
+%check if # of target sync id's in nlx is same as fscv system, otherwise 
+%break in recording or something wrong with communication between systems
+if length(nlxTargetTSs)==length(nlxTargetTSs2)
+    discrepancy=nlxTargetTSs-nlxTargetTSs2'; %check if Ts's match up, maybe some error < 1ms
+    writelog=[alignname ': max discrepancy = ' num2str(max(discrepancy))];
+    %record in log file
+    log=[log sprintf('\n') writelog];
+else
+    lengthFSCVIDs=length(nlxTargetTSs);
+    lengthNlxIDs=length(nlxTargetTSs2);
+    discrepancy=nlxTargetTSs(1:min(lengthFSCVIDs,lengthNlxIDs),:)-nlxTargetTSs2(:,1:min(lengthFSCVIDs,lengthNlxIDs))';
+    warning(['# of nlx target ids is different from fscv target ids by ' num2str(length(nlxTargetTSs2)-length(nlxTargetTSs))]);
+    writelog=['# of nlx target ids is different from fscv target ids by ' num2str(length(nlxTargetTSs2)-length(nlxTargetTSs))];
+    %record in log file
+    log=[log sprintf('\n') writelog];
+end
+if any(abs(discrepancy)>0.1)
+    trialsLagging=find(abs(discrepancy)>0.1);   %get IDs for trials with significant sync lag
+    %check if any ts's stored are more than 0.1 s different between systems
+    warning('time discrepancies between saved nlx ID ts and synchronized nlx ids in fscvNlxEvents > 0.1 s');
+    display(['lagging trials: ' num2str(trialsLagging','%10.0f\n')]);
+    writelog=['time discrepancies between saved nlx ID ts and synchronized nlx ids in fscvNlxEvents > 0.1 s' ...
+        '%10.0f\n' 'lagging trials: ' num2str(trialsLagging','%10.0f\n')];
+    %record in log file
+    log=[log sprintf('\n') writelog];
+    if length(trialsLagging)>15
+        disp(['attempt to realign'])
+         writelog=['attempt to realign, saving -' alignname '-alignts-....'];
+        %record in log file
+        save([savefolder alignname '-alignts'],'nlxTargetTSs','nlxTargetTSs2');
+        log=[log sprintf('\n') writelog];
+        intervalstsFSCV=diff(nlxTargetTSs(1:min(length(nlxTargetTSs),length(nlxTargetTSs2))));
+        intervalstsNlx=diff(nlxTargetTSs2(1:min(length(nlxTargetTSs),length(nlxTargetTSs2))));
+        [r,p]=corr(intervalstsFSCV,intervalstsNlx');
+        if length(nlxTargetTSs)>length(nlxTargetTSs2) && r<0.95
+            %more fscv targ ieds than nlx
+            %remove one of fscv target ids causing desychcronization
+            if length(nlxTargetTSs)-1==length(nlxTargetTSs2)
+                disp(['more fscv events than nlx, removing trial # ' num2str(trialsLagging(1)) ]);
+                writelog=['more fscv events than nlx, removing trial # ' num2str(trialsLagging(1)) ' saving -' alignname '-alignts_revised-...' ];
+                %record in log file
+                log=[log sprintf('\n') writelog];
+                medianlag=median(abs(discrepancy(trialsLagging)));
+                trialidremove=find(abs(discrepancy)>=medianlag);            %CHANGE 4/2019, NEED TO CHANGE ALSO in SYNCSIGS
+                fscvTargetTrialsIDs(trialidremove(1))=[];
+                nlxTargetTSs=fscvNlxEvents(fscvTargetTrialsIDs,4);
+                save([savefolder alignname '-alignts_revised'],'nlxTargetTSs','nlxTargetTSs2');
+                intervalstsFSCV=diff(nlxTargetTSs(1:min(length(nlxTargetTSs),length(nlxTargetTSs2))));
+                intervalstsNlx=diff(nlxTargetTSs2(1:min(length(nlxTargetTSs),length(nlxTargetTSs2))));
+                [r,p]=corr(intervalstsFSCV,intervalstsNlx');
+                if r<0.95
+                    error(['fscv and nlx still descyrhonized after removing potential fscv obstacle event, need to manually fix']);
+                end
+            else
+                    %2nd try added 5/2019
+                    medianlag=median(abs(discrepancy(trialsLagging)));
+                        trialidremove=find(abs(discrepancy)>=medianlag);   
+                   warning(['fscv and nlx events are same length already, but will try removing fscv trials']);
+                   [rforward,p]=corr(intervalstsFSCV(trialidremove(1)+1:end),intervalstsNlx(trialidremove(1):end-1)');        %move fscv forward one, by removing first lagging trial
+                   [rbackward,p]=corr(intervalstsFSCV(trialidremove(1):end-1),intervalstsNlx(trialidremove(1)+1:end)');     %move nlx forward one, by removing first lagging trial
+                   if rforward>rbackward
+                       warning('nlx event seems to be shifted forward relative fscv, so try removing nlx event');                       
+                       fscvTargetTrialsIDs(trialidremove(1))=[];
+                        nlxTargetTSs=fscvNlxEvents(fscvTargetTrialsIDs,4);
+                        save([savefolder alignname '-alignts_revised2'],'nlxTargetTSs','nlxTargetTSs2');
+                        intervalstsFSCV=diff(nlxTargetTSs(1:min(length(nlxTargetTSs),length(nlxTargetTSs2))));
+                        intervalstsNlx=diff(nlxTargetTSs2(1:min(length(nlxTargetTSs),length(nlxTargetTSs2))));
+                        [r,p]=corr(intervalstsFSCV,intervalstsNlx');
+                         if r<0.95
+                             warning('still not fixed, removing one more after updating new lagging')
+                             discrepancy=nlxTargetTSs(1:min(lengthFSCVIDs,lengthNlxIDs),:)-nlxTargetTSs2(:,1:min(lengthFSCVIDs,lengthNlxIDs))';
+                                     trialsLagging=find(abs(discrepancy)>0.1);   %get IDs for trials with significant sync lag
+                             medianlag=median(abs(discrepancy(trialsLagging)));
+                        trialidremove=find(abs(discrepancy)>=medianlag);   
+                             fscvTargetTrialsIDs(trialidremove(1))=[];
+                            nlxTargetTSs=fscvNlxEvents(fscvTargetTrialsIDs,4);
+                            save([savefolder alignname '-alignts_revised3'],'nlxTargetTSs','nlxTargetTSs2');
+                            intervalstsFSCV=diff(nlxTargetTSs(1:min(length(nlxTargetTSs),length(nlxTargetTSs2))));
+                            intervalstsNlx=diff(nlxTargetTSs2(1:min(length(nlxTargetTSs),length(nlxTargetTSs2))));
+                            [r,p]=corr(intervalstsFSCV,intervalstsNlx');
+                            if r<0.95
+                                warning('still not fixed, removing one more after updating new lagging')
+                             discrepancy=nlxTargetTSs(1:min(lengthFSCVIDs,lengthNlxIDs),:)-nlxTargetTSs2(:,1:min(lengthFSCVIDs,lengthNlxIDs))';
+                                     trialsLagging=find(abs(discrepancy)>0.1);   %get IDs for trials with significant sync lag
+                             medianlag=median(abs(discrepancy(trialsLagging)));
+                        trialidremove=find(abs(discrepancy)>=medianlag);   
+                             fscvTargetTrialsIDs(trialidremove(1))=[];
+                            nlxTargetTSs=fscvNlxEvents(fscvTargetTrialsIDs,4);
+                            save([savefolder alignname '-alignts_revised4'],'nlxTargetTSs','nlxTargetTSs2');
+                            intervalstsFSCV=diff(nlxTargetTSs(1:min(length(nlxTargetTSs),length(nlxTargetTSs2))));
+                            intervalstsNlx=diff(nlxTargetTSs2(1:min(length(nlxTargetTSs),length(nlxTargetTSs2))));
+                            [r,p]=corr(intervalstsFSCV,intervalstsNlx');
+                            %{
+                            %for gettrialorder timing not critical
+                            if r<0.95
+                                error(['manually fix']);
+                            end
+                            %}
+                            end
+                         end
+                   else
+                       error('fscv event seems to be shifted forward relative to nlx, manually fix or add code');
+                   end
+                   
+                end         
+        else
+            error(['more nlx target events than fscv target events, & more than 15 trials desychronized, need to manually fix']);
+        end
+    end
+end
+
+%Get corresponding TS ID for Nlx ephys/eye recording samples that will be
+%extracted as needed from samples variable loaded previously
+%MAY NOT BE EFFICIENT, CHECK
+for ii=1:length(nlxTargetTSs)
+    tTemp=find(TS<=nlxTargetTSs(ii)+.0001 & TS>=nlxTargetTSs(ii)-0.0001);
+    lfp_tID(ii)=tTemp(1);
+end
+
+save([savefolder 'logfile'],'log');
+
+
+%Get samples offset from trial targeted Sync event (ie. how much to store)
+fscvSamplesOffset=preOffset*fscvRate;
+nlxSamplesOffset=ceil(preOffset*ratelfp);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+%List trial id's time stamps for current trial type
+syncData={};    
+tsLFP=[];
+NlxEventTTL=[];
+NlxEventTS=[];
+fscvData=[];
+fscvEvents=[];
+initialNum=100;
+previousID=0;
+totaltrials=length(fscvTargetTrialsIDs);
+
+for ii=1:totaltrials
+    disp(['split trial # ' ...
+        num2str(ii) '/' num2str(totaltrials)]);
+    if fscvTargetTrialsIDs(ii)==previousID
+        continue
+    end
+    %get start IDs for fscv & nlx samples to capture
+    currentFSCVIndex=fscvTargetTrialsIDs(ii)-fscvSamplesOffset;
+    currentLFPIndex=lfp_tID(ii)-nlxSamplesOffset;
+    %check if currentLFPIndex>0 07/31/2018
+    if currentLFPIndex<1 || currentFSCVIndex<1
+        warning('first trial not included because index <1');
+        writelog=['align ' alignname ': first trial not included because index <1'];
+        %record in log file
+        log=[log sprintf('\n') writelog];      
+        continue
+    end
+    nextFSCVIndex=currentFSCVIndex+durationTrial*fscvRate;
+    nextLFPIndex=currentLFPIndex+ceil(durationTrial*ratelfp);
+    if currentFSCVIndex<1
+        currentFSCVIndex=1;
+    end
+    %Extract fscv data for appropriate trial indeces from merged txt data
+    if ii<length(fscvTargetTrialsIDs) && nextLFPIndex<=length(TS)
+        %if not last target ID, get to next trial end
+        if nextFSCVIndex>size(fscvNlxEvents,1)
+            nextFSCVIndex=size(fscvNlxEvents,1);
+        end
+        if currentFSCVIndex>size(fscvNlxEvents,1)
+            display(['start sync trigger ID = ' num2str(currentFSCVIndex)]);
+            display(['length of samples = ' num2str(size(fscvNlxEvents,1))]);
+            writelog=['align ' alignname ': ERROR start sync trigger > length of FSCV recording' +sprintf('\n') ...
+                'check if FSCV recording experienced break or data drop'];
+            %record in log file
+            log=[log sprintf('\n') writelog];    
+            error(['start sync trigger > length of FSCV recording' +sprintf('\n') ...
+                'check if FSCV recording experienced break or data drop'])              
+        end 
+        syncData(ii).events=fscvNlxEvents(currentFSCVIndex:nextFSCVIndex,:);
+        tsLFP=TS(currentLFPIndex:nextLFPIndex);
+        nlxTargetIDsWithinTrial=find(nlx_ts>=tsLFP(1) & nlx_ts<=tsLFP(end));
+        NlxEventTTL=dg_Nlx2Mat_TTL(nlxTargetIDsWithinTrial);
+        NlxEventTS=nlx_ts(nlxTargetIDsWithinTrial);
+        %check how much apparent deviation in time from fscv trial & nlx
+        %trial start ID, if over 500 ms, then too much
+        if tsLFP(1)>syncData(ii).events(1,4)+0.5 || tsLFP(1)<syncData(ii).events(1,4)-0.5
+            warning(['trial ' num2str(ii) ' has > 0.5 s latency'])
+            display(['latency first idx in saved fscv trial data and ' ...
+                'nlx is: ' num2str(tsLFP(1)-syncData(ii).events(1,4))]);
+            writelog=['align ' alignname ': trial ' num2str(ii) ' (file ' num2str(initialNum) ...
+                ') sample 1 latency: ' ...
+                    num2str(tsLFP(1)-syncData(ii).events(1,4)) ' s'];
+            %record in log file
+            log=[log sprintf('\n') writelog];                
+        end
+    else
+        %get to end of recording
+        if fscvTargetTrialsIDs(ii)<=length(fscvNlxEvents)
+            nextfidx=length(fscvNlxEvents);           
+            syncData(ii).events=fscvNlxEvents(currentFSCVIndex:length(fscvNlxEvents),:);
+            nextidxlfp=nextLFPIndex;           
+            tsLFP=TS(currentLFPIndex:end);
+            nexttargetid=nlxTargetIDs(ii)+100;
+            if nexttargetid>length(dg_Nlx2Mat_TTL)
+                nexttargetid=length(dg_Nlx2Mat_TTL);
+            end
+            NlxEventTTL=dg_Nlx2Mat_TTL(nlxTargetIDs(ii):nexttargetid);
+            NlxEventTS=nlx_ts(nlxTargetIDs(ii):nexttargetid);
+        end
+    end
+    frt=nan;
+    trt=nan;
+    side=nan;
+    ats=nan;
+    aidx=lfp_tID(ii);
+    [frt,trt,side,ats]=gettrialrts(NlxEventTTL,NlxEventTS,TS(aidx),aligns{ialign});
+    if fscvTargetTrialsIDs(ii)<=length(fscvNlxEvents)
+        saveName=['fscv_multi_' num2str(initialNum)];
+        aidx=lfp_tID(ii);
+        trlist(trcount).ts=TS(aidx);     %TS at outcome (30s)
+        trlist(trcount).type=alignname;
+        trlist(trcount).id=initialNum;          %label # defined for each trial type, as trial # for that type, category specific
+        trlist(trcount).tsfscv=fscvNlxEvents(fscvTargetTrialsIDs(ii),4);     %TS at outcome (30s) in fscv events
+        trlist(trcount).eventsfscv=syncData(ii).events;
+        trlist(trcount).NlxEventTTL=NlxEventTTL;
+        trlist(trcount).NlxEventTS=NlxEventTS;
+        trlist(trcount).side=side;
+        trlist(trcount).frt=frt;
+        trlist(trcount).trt=trt;
+        trlist(trcount).ats=ats;
+        %merge all signals into one file
+       % save([PathName4, saveName],'fscv','samplesLFP','tsLFP','NlxEventTTL','NlxEventTS','nlxFileNames','-v7.3');
+        %prompt = ['saved as: ' saveName];     
+        initialNum=initialNum+1;
+        trcount=trcount+1;
+    end
+   % fprintf('%d \r', floor(ii/length(fscvTargetTrialsIDs)*100)); 
+    previousID=fscvTargetTrialsIDs(ii);
+end
+
+save([savefolder 'logfile'],'log');
+end
+%%
+%sort table by timestamps of each trial
+[tssorted,sortid]=sort([trlist.ts]);
+trlistnew=trlist(sortid);
+trlist=trlistnew;   
+save([analysispath 'trlist'],'trlist');
+
+
+end

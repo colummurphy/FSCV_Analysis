@@ -1,0 +1,8 @@
+csc	# spikes	# biphasic spikes
+csc8	109748	11
+csc12	26118	42
+csc26	133033	11
+csc14	72728	6
+csc28	41320	72
+csc29	82206	5334
+csc30	89278	49

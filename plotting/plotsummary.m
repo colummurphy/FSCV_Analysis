@@ -1,0 +1,154 @@
+function plotsummary(xinfo,trialinfo,plotparam,varargin)
+%plot bar scatter plots of properties of cross-covariance lags/waveforms
+%12/31/2018 updated for timing characteristics from new xclust 
+%same as plotx, but plot big/small/targ on same plots
+%for plotting multiple sessions
+%1/3/2018, udpates as in plotx/plotxallsess
+%PLOT TRACES for DA GROUPS, mean
+%OVERLAY BIG VS SAMLL and defined groups
+figpos=[50,50,1500,400];
+%figsess=figure('color',[1 1 1]);
+%set(figsess,'position',figpos);
+figsess=figure('visible','off');     %figure for each channel
+if ispc
+figsess=figure('visible','on');     %figure for each channel
+end
+set(figsess,'position',figpos,'color',[1 1 1]);
+set(0,'CurrentFigure',figsess);    %set figure handle to current figure
+axa={};
+axsiz=[275 250];
+off=75;
+mar=100;
+markr=[1 .5 .0; .3 .3 0; .9 .1 0];
+mark=[0 0.1 .7; 0.8 0 .5; 0 .7 0;.7 0 0; 0.4 0 .7];
+sessmark={'.','+','o','^','s','*','v','p','h','x'};
+sessmarktxt={'.','+','o','\Delta','sq','*','\nabla','p','h','x'};
+rate=10;      %10hz default for downsampled da/lfp from xcov
+win=[-2 2];     %+/-2 s from aln idx
+interval=1;       %in seconds
+ratelfp=1000;
+argnum=1;
+datype='daall';
+targval='targpeak';
+fontsize=12;
+
+savepath=plotparam.savepath;
+sessnums=plotparam.sessnums;
+sessgroups=sessnums;
+daregions={'c','p'};
+dalabels={'cn','put'};
+conditions={'left','right'};
+condlabels={'L','R'};
+plotnums=1:length(daregions)*length(conditions);
+plotvar={};
+event='targ';
+sites=getsites(sessnums,targdasites);
+uniquesites=unique({sites(1:end).site});
+while argnum<=length(varargin)
+    switch varargin{argnum}
+        case 'event'
+            argnum=argnum+1;
+            event=varargin{argnum};
+        case 'sessgrp'
+            %groups sessions for same unmoved site
+            %groupsess={{'73'},{'83','92'}};
+            argnum=argnum+1;
+            sessgroups=varargin{argnum};
+        case 'metric'
+            argnum=argnum+1;
+            targval=varargin{argnum};
+    end
+    argnum=argnum+1;
+end
+
+for ic=1:length(conditions)
+    for ir=1:length(daregions)
+        plotvar{ir+length(conditions)*(ic-1)}=[dalabels{ir} '_' condlabels{ic}(1)];
+    end
+end
+sessiontypes={'big','small'};
+%plot da differences (max, mean) targ window big vs small for 
+%CN Left, CN right, P left, P right
+clf(figsess,'reset');
+set(figsess,'color',[1 1 1]);
+axpos={};
+for ip=plotnums
+    axa{ip}=subplot(1,length(plotnums),ip);   hold(axa{ip},'on');
+    set(axa{ip},'units','pixels');
+    axpos{ip}=get(axa{ip},'position');
+    set(axa{ip},'xtick',1:length(sessiontypes),'xticklabel',sessiontypes);
+    set(axa{ip},'xlim',[0 length(sessiontypes)+1]);
+    set(axa{ip},'xTickLabelRotation',90)
+    set(axa{ip},'position',[(ip-1)*axsiz(1)+ip*(mar/2)+off,75,axsiz(1),axsiz(2)])
+    ax=text(axa{ip},10,axsiz(2),plotvar{ip},'units','pixels','fontweight','bold');
+end
+titletext=[event ' | ' targval];  
+set(axa{1},'units','pixels')
+axpos=get(axa{1},'position');
+text(axa{1},-100,axpos(4)+30,titletext,'units','pixels','fontweight','bold');
+labelx={};
+ranj=[];        %random jitter x axis for each site
+for is=1:length(uniquesites)
+    labelx{is}=[num2str(uniquesites{is})];  
+    axpos=get(axa{1},'position');
+    ax=text(axa{1},100+is*50,axpos(4)+30,labelx{is},'units','pixels','fontweight','bold','color',mark(is,:));
+end
+for is=1:length(sessnums)
+    text(axa{1},400+is*50,axpos(4)+30,[num2str(sessnum) ' ' sessmarktxt{is}],'interpreter','tex','units','pixels','fontweight','bold','color',[0 0 0]);
+    ranj(is)=rand(1,1)*.5-.25;
+end
+    
+for icond=1:length(conditions)
+for ida=1:length(targdasites)
+    %each da separate subplot  
+    lfpsites={};
+    daregion=contains(targdasites(ida),'c');     %1=='c'
+    if daregion
+        %CN
+        pid=1+(icond-1)*2;
+    else
+        %put
+        pid=2+(icond-1)*2;
+    end       
+    count=1;
+    plotdata=[];    
+    sesslab=[];
+for ise=1:length(sessnums)
+    sesslab=num2str(sessnums(ise));
+    trialinfo=trialgrps(ise).trialinfo;
+    avy=nan(1,2);
+    ciy=nan(1,2);
+for itype=1:length(sessiontypes)
+    %big vs small
+    targt=find(contains(trialinfo(itype).trialtypes.names,conditions(icond))==1);
+    trialnums=trialinfo(itype).trialtypes.nums{targt};
+    targsi=find([sites.sessnum]==sessnums(ise) & ...
+        strcmp({sites.probeid},targdasites(ida)));
+    ich=sites(targsi(1)).ch;
+    datarg=datm{ise}{itype}{ich};
+    trialids=find(ismember(datarg.trialnums,trialnums)==1);
+    davals=getfield(datarg,targval);    %all da values for good trials for sess/type
+    yvals=davals(trialids);         %da values for specific condition (le/ri) trials
+    %xplot=repmat(itype,1,length(yvals))+ranj(ise);
+    ciy(itype)=nanstd(yvals)./sqrt(length(yvals(~isnan(yvals))))*1.96;
+    avgy(itype)=nanmean(yvals);
+    is=find(strcmp(uniquesites,sites(targsi).site)==1); %idx for unique site name
+    aci=plot(axa{pid},[itype itype]+ranj(ise),[avgy(itype)-ciy(itype)  avgy(itype)+ciy(itype)],'-','linewidth',1,'color',mark(is,:));  
+    aci.Color(4)=.5;
+end
+scatter(axa{pid},(1:length(sessiontypes))+ranj(ise),...
+            avgy,80,sessmark{ise},'markeredgecolor',mark(is,:),...
+            'MarkerEdgeAlpha',.5,'linewidth',1);
+aline=plot(axa{pid},(1:length(sessiontypes))+ranj(ise),avgy,'-','linewidth',1,'color',mark(is,:));      
+aline.Color(4)=.3;
+set(findall(axa{pid},'-property','FontSize'),'FontSize',fontsize)
+
+end
+end
+end
+
+
+savefig(figsess,[savepath event '_' targval]);
+saveas(figsess,[savepath event '_' targval],'tif')
+delete(findall(figsess,'type','text')) 
+end
