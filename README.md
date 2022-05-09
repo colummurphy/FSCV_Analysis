@@ -12,10 +12,12 @@ getTRdata
   
   
 updateTRlists
+
   Same as above, but just update trlist in trlists file and resave in order to update manually selected good/bad trials list (saved in excel in original FSCV dir)
   
   
 analyzeSes
+
   Open up trlists (as created in above functions) and create workspace for analyzing data within
   e.g. analyzeSes(83,'fscvchs',[2 4],'nlxch',{'cl4-cl6','pulse','lickx'})
   *NEED to update the folders in the top of the code*
