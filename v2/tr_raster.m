@@ -45,11 +45,13 @@ while argnum<=length(varargin)
         case 'da'
             argnum=argnum+1;
             dach=varargin{argnum};     %Da chs to plot
-            signaltype='FSCV';
+            signaltype='fscv';
+            datavar='fscv';
         case 'nlx'
             argnum=argnum+1;
             nlxname=varargin{argnum};  %Nlx name (e.g. pulse, 'pl1-p5', etc.)
-            signaltype='Nlx';
+            signaltype='nlx';
+            datavar='nlx';
         case 'cscale'
             argnum=argnum+1;
             cscale=varargin{argnum};    %Cscale for clim 
@@ -113,8 +115,13 @@ trlist=trlists.trlist;
 
 %Get Trial #'s for plotting from trlists.trlist based on supplied ttypes
 %and signaltype
-trids=getTrialIDs(trlists,ttypes,signaltype,'dach',dach);
-
+trids=[];
+if strcmp(datavar,'fscv')
+    trids=getTrialIDs(trlists,ttypes,signaltype,'dach',dach);
+else
+    signaltype='nlx';
+    trids=getTrialIDs(trlists,ttypes,signaltype);
+end
 %Get plotting events and alignment of signals (TS's for each trial)
 %Since multiple trials in each trial data, need to get the events closest
 %and before trlist.ts (i.e. outcome ts)
