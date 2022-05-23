@@ -6,7 +6,10 @@ function evtcode = getEvtID(eventname,eventcodes)
 evtcodeid=find(strcmp(eventcodes(:,2),eventname));
 evtcode=[];
 if ~isempty(evtcodeid)
-    evtcode=str2num(eventcodes{evtcodeid,1});
+    %Cycle through found event id's since may be multiple
+    for ii=1:length(evtcodeid)
+        evtcode(ii)=str2num(eventcodes{evtcodeid(ii),1});
+    end
 else
     error('Event code invalid')
 end

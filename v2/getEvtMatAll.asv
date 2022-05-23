@@ -1,5 +1,7 @@
-function [evmat,evmatfids,evmatfscv,evmatfscvnlx] = getEvtMat(plotevents,trlist,eventcodes,varargin)
+function [evmat,evmatfids,evmatfscv,evmatfscvnlx] = getEvtMatAll(plotevents,trlist,eventcodes,varargin)
 %05/2022
+%Same as getEvtMat, except store as struct so get all timestamps within window for each
+%event within a "trial" rather than just the one closest to outcome
 %Get event matrix containing time stamps (Nlx TSs) for each selected plotting event
 %Only get events closest to outcome
 %(col) and trial (row) from trlist (variable in trlists containing all trs)
@@ -15,6 +17,9 @@ function [evmat,evmatfids,evmatfscv,evmatfscvnlx] = getEvtMat(plotevents,trlist,
 %timestamps).
 
 outcomeFSCVsample=301;  %Sample for all trial based FSCV data at which outcome is delivered as set in syncsigs
+win=[];   %10 s before and 1 s after outcome to get events, default. If blank, get all events between last outcome and current outcome
+defaultInterval=15;
+roundingPad=0.1;    %Padding because of rounding errors for some of events when downsampled
 trids=1:length(trlist);%Default all trials selected
 argnum=1;
 while argnum<=length(varargin)
@@ -23,16 +28,38 @@ while argnum<=length(varargin)
             %User supplied trial id's selected
             argnum=argnum+1;
             trids=varargin{argnum};
+        case 'window'
+            %User supplied window from outcome to get events from
+            argnum=argnum+1;
+            win=varargin{argnum};
     end
     argnum=argnum+1;
 end
+outcomeCodes={   
+    '6'     'break_fix' ...    
+    '12'    'break_target'  ...    
+    '45'    'reward_big'    ...
+    '18'    'reward_big'...
+    '19'    'reward_big'...
+    '46'    'reward_small'  ...
+    '22'    'reward_small'...
+    '23'    'reward_small'...
+    };
+outCIDs=getNumericEvtCodes(outcomeCodes);   %Just get array of numeric ids for evt codes
 
-evmatrix=zeros(length(trids),length(plotevents));
-evmatFSCV=zeros(length(trids),length(plotevents));  %From evFSCV, check, fscv TS
-evmatFSCVids=zeros(length(trids),length(plotevents));  %From evFSCV, but sample IDs rather than fscv TS
-evmatFSCVnlx=zeros(length(trids),length(plotevents));  %From evFSCV, check -- does not match nlx events (e.g. NlxEventTS, most likely during syncsigs did not explicitly write these in for each ev but relied on interp)
+
+
+evmatrix=cell(length(trids),length(plotevents));
+evmatFSCV=cell(length(trids),length(plotevents));  %From evFSCV, check, fscv TS
+evmatFSCVids=cell(length(trids),length(plotevents));  %From evFSCV, but sample IDs rather than fscv TS
+evmatFSCVnlx=cell(length(trids),length(plotevents));  %From evFSCV, check -- does not match nlx events (e.g. NlxEventTS, most likely during syncsigs did not explicitly write these in for each ev but relied on interp)
 for it=1:length(trids)
     outTS=trlist(trids(it)).ts; %Outcome TS, any event within current trial should occur before or at this TS (e.g. reward TS would be at this TS)
+    prevtrid=trids(it)-1;
+    prevOutTS=outTS-defaultInterval;
+    if prevtrid>0
+        prevOutTS=trlist(prevtrid).ts;  %Get previous outcome TS, so can get all evts in btw
+    end
     evFSCV=trlist(trids(it)).eventsfscv;            %Events embedded in FSCV sample TS's
     evNlx=trlist(trids(it)).NlxEventTTL;            %Original Nlx events 
     evNlxTS=trlist(trids(it)).NlxEventTS;       %Nlx event TSs
@@ -48,13 +75,20 @@ for it=1:length(trids)
             if ~isempty(posTSid)
                 targTS=evTS(posTSid(end));%Target TS is the last positive (minimum) closest to out TS
             end
+            %Get other TS's within interval from prevOutTS
+            IDsinBTW=find(evTS>=prevOutTS-roundingPad & evTS<targTS);
+            if ~isempty(IDsinBTW)
+                targTS=[targTS evTS(IDsinBTW)];
+            end
         end
-        evmatrix(it,ee)=targTS;        
+        evmatrix(it,ee)={targTS};  %store array of TSs within defined window, i.e. last out      
 
         %Check evFSCV to see if matches nlx
         [evIDsR,evIDsC]=find(ismember(evFSCV(:,5:12),curcodes));%Find event ids in fscv ev data
         %[evIDsR,evIDsC]=find(evFSCV(:,5:12)==curcode);%Find event ids in fscv ev data
         evIDsR=sort(evIDsR);    %Get all rows regardless of column in order for code to work below (i.e. finding idx closest to outcome)
+       
+          
         targTS=nan;%target nlx TS in FSCV
         targTSf=nan;%target TS FSCV
         targIDf=nan;%target ID FSCV
@@ -65,10 +99,23 @@ for it=1:length(trids)
             if ~isempty(posTSid)
                 targTSf=evTS(posTSid(end));
                 targIDf=evIDsR(posTSid(end));
+                %Get other TS's within interval from prevIToutF (previous
+                %outcome in FSCV temporal domain
+                IDsinBTW=find(evIDsR>=prevIDoutF & evIDsR<targIDf);
+                if ~isempty(IDsinBTW)
+                    targIDf=[targIDf; evIDsR(IDsinBTW)];
+                    targTSf=[targTSf; evTS(IDsinBTW)];
+                end
             end
-            posTSid=find((outTS-evTSnlx)>=-0.0001);
-            if ~isempty(posTSid)
-                targTS=evTSnlx(posTSid(end));
+            posTSidFSCVnlx=find((outTS-evTSnlx)>=-0.0001);%In Nlx timedomainr eference
+            if ~isempty(posTSidFSCVnlx)
+                targTS=evTSnlx(posTSidFSCVnlx(end));
+                %Get other TS's within interval from prevIToutF (previous
+                %outcome in FSCV temporal domain
+                IDsinBTW=find(evIDsR>=prevIDoutF & evIDsR<targIDf);
+                if ~isempty(IDsinBTW)
+                    targTS=[targTS; evTSnlx(IDsinBTW)];
+                end
             end
         end
         evmatFSCV(it,ee)=targTSf;

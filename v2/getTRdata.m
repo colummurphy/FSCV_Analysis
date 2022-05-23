@@ -358,6 +358,7 @@ for idx=1:length(param.NCSchannels)
     tr_nlx={trlists.nlx{idx}.ephys}';   %Extract data from trlists for this ch
     save([savepath savename],'tr_nlx','-v7.3');
 end
+%Save trlists data
 trlists=rmfield(trlists,{'nlx','fscv'});%Remove data fields and then save
 save([savepath 'trlists'],'trlists')
 

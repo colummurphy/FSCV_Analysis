@@ -151,4 +151,5 @@ for nlxch=1:length(ncschannels)
     load([analysispath.home 'tr' filesep savename],'tr_nlx');
     trlists.nlx{idx}=tr_nlx;%Store nlx data for ch into trlists
 end
-assignin('base','trlists',trlists)
+trlists.sess=sessid;
+assignin('base','trlists',trlists)%Put trlists in workspace for further use
