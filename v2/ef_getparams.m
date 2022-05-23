@@ -1,10 +1,10 @@
-function [parameters,csc_map,event_codes]=ef_getparams(subjectid,recordid,ncschannels,varargin)
+function [parameters,csc_map,eventcodes]=ef_getparams(subjectid,recordid,ncschannels,varargin)
 %05/02/2022 Merge param with plotparam from getplotsettings.m
 %get plotParam and parameters variables as well as maps for subject &
 %recording setting
 rateEphys=1e3;  %assume all 1kHz downconverted ep hys
 csc_map={};
-event_codes={};
+eventcodes={};
 parameters.ratelfp=rateEphys;  %default sampling rate
 %default fscv params
 anodal_lim=1.3;
@@ -28,7 +28,7 @@ if isempty(sessionnum)
         %which csc_map to use
         clear sessionnum;
 end
-%get csc_map, PCR file dir, event_codes for subject
+%get csc_map, PCR file dir, eventcodes for subject
 switch subjectid
     case 'patra'
         patra_map
@@ -269,7 +269,7 @@ plotParam.physid=find(~ismember(1:length(ncschannels),plotParam.lfpid));
 end
 
 parameters.plotParam=plotParam;
-code=reshape(event_codes,2,length(event_codes)/2);
+code=reshape(eventcodes,2,length(eventcodes)/2);
 map=reshape(csc_map,2,length(csc_map)/2);
 parameters.eventcodes=code';
 parameters.cscmap=map';

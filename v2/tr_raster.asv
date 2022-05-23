@@ -1,14 +1,24 @@
-function tr_raster()
-persistent trlists
+function [axa,trids,tbt_winData]=tr_raster(trlists,datavar,varargin)
+%User provides channel and data varaible to plot 
+% datavar = fscv or nlx (struct variable in trlists)
+%persistent trlists
 %Plot raster plots for sel chs and options
-
+fontsize=10;
+figpos=[50,50,700,900];
+numplots=1;
+[figsess,axa]=setupFig(figpos,numplots);
 pathsave=[trlists.path.home 'trout' filesep];   %Save path
+sessid=trlists.sess;    %Session id
 if ~isfolder(pathsave)
     mkdir(pathsave);
 end
-datavar='fscv'; %Processed variable (struct) to open in trlists.processed
+%datavar='fscv'; %Processed variable (struct) to open in trlists.processed
+signaltype='FSCV';   %Signal source type: FSCV or Nlx
+sitename='';
+bgwinSampSize=3;    %Size of window for averaging signal for background signal for FSCV
 dach=[];
 betach=[];
+nlxname='pulse';
 eventaln='display_target';
 outcomeTS=30;   %30s default alignment (sample 301 for fscv, assuming first TS=0s) for all trials as done in extractionsession for FSCV/ephys
 sorttrs=0;      %Default no sort, by trial order
@@ -17,9 +27,14 @@ sortwin=[0 4];
 sortwin={'targ','outcome'};
 win=[-2 6];     %Plot window
 plotz=0;
-ttypes={'big','left'};        %condition types grouped eg. {{'big','left'},{'small','left','aftersm'}}, first arg must be "big" small, targetbreak or fixbreak type
+ttypes={'big','left'};        %Condition types first arg must be main condition (big, small, targetbreak,fixbreak), the rest can be target side (left or right) {'big','left'} 
 plotevents={'display_fix','display_target','reward_big','reward_small','break_target','break_fix'};%events to plot with markers if present in trial
+pEvtSize=15;    %Marker size for events
+pEvtColors=cool(length(plotevents)-1);  %Plot markers colors
+cscale=[];  %Color scale
+normscale=1;    %Nomralize scale
 errortr=0;          %Flag don't plot error trials = 0, plot error = 1, plot only error =2
+sorttype='';        %Sort type
 argnum=1;
 while argnum<=length(varargin)
     switch varargin{argnum}   
@@ -30,22 +45,22 @@ while argnum<=length(varargin)
         case 'da'
             argnum=argnum+1;
             dach=varargin{argnum};     %Da chs to plot
-        case 'beta'
-            %Beta to plot (must be processed var in trlists)
+            signaltype='FSCV';
+        case 'nlx'
             argnum=argnum+1;
-            betach=varargin{argnum};   
+            nlxname=varargin{argnum};  %Nlx name (e.g. pulse, 'pl1-p5', etc.)
+            signaltype='Nlx';
+        case 'cscale'
+            argnum=argnum+1;
+            cscale=varargin{argnum};    %Cscale for clim 
         case 'event'
             %Alignment event
             argnum=argnum+1;    
             eventaln=varargin{argnum};         %event period, eg. fix, targ, outcome       
         case 'sort'
             %sort by signal quantity, define ('avg' over win, 'peak' in)
-            sorttrs=1;
             argnum=argnum+1;
-            sorttype=varargin{argnum};      %'avg' or 'peak'
-            if contains(sorttype,'rts')
-                sortrts=1;
-            end
+            sorttype=varargin{argnum};      %'avg' or 'peak' or 'rt_fix' or rt_target
         case 'sortwin'
             %Only if sort selected, window to define avg or peak
             argnum=argnum+1;
@@ -96,48 +111,122 @@ end
 
 trlist=trlists.trlist;
 
-%Get Trial #'s for plotting from trlists.trlist
-trids=find(contains({trlist.type},ttypes{1}));
-%Open good/bad trials from FSCV, if FSCV data, then sel the act channel
-goodtrs=[];
-if strcmp(datavar,'fscv')
-    goodtrs=find([trlists.fscv{dach}.good]);
-    trids=intersect(trids,goodtrs);
-else
-    %Any other data variable take good trials from fscv (or of all chs)
-    %Get union of all chs
-    goodtrslist=[];
-    for ii=1:length(trlists.fscv)
-        goodtrslist(ii,:)=[trlists.fscv{ii}.good];
-    end
-    goodtrs2=sum(goodtrslist);
-    goodtrs=find(goodtrs2~=0);
-    trids=intersect(trids,goodtrs);
-end
-
+%Get Trial #'s for plotting from trlists.trlist based on supplied ttypes
+%and signaltype
+trids=getTrialIDs(trlists,ttypes,signaltype,'dach',dach);
 
 %Get plotting events and alignment of signals (TS's for each trial)
 %Since multiple trials in each trial data, need to get the events closest
 %and before trlist.ts (i.e. outcome ts)
 eventcodes=trlists.param.eventcodes;
-evtcode=getEvtID(eventaln,eventcodes);     %Get numeric code for event name
+%evtcode=getEvtID(eventaln,eventcodes);     %Get numeric code for specified event name
+
+%Get sort type variables, if beahvioral varaible call function to get/calc
+%target behavior
+origtrids=trids;    %Store orig unsorted trids;
+if ~isempty(sorttype)
+    behsig=getBehVar(trlists,sorttype,trids); %Get behavioral signal given trids and type of beh (sorttype)    
+    %Sort trids based on behsig
+    [sortedbehsig,sortid]=sort(behsig,'ascend');
+    trids=trids(sortid);%Sorted trids;
+end
 
 %Create array matrix TS's w/ columns refer to plotevents and rows to trids
-evmat=getEvtMat(plotevents,trlist,eventcodes,'trialids',trids);     %Get event matrix for all trials
+%Use FSCV timestamps (or FSCV sample ids, evmatfids) rather than NLx timestamps for FSCV signals as to not
+%accumulate errors in rounding since already rounded during FSCV extract
+%(probably not accumulating errors, but since there are 40-50 ms periods of
+%time precision that can occur between target onset and reward, better to
+%follow rounding done during original extraction than possibility of
+%rounding off differently here and making another error
+[evmatA,evmatfidsA]=getEvtMatAllNum(plotevents,trlist,eventcodes,'trialids',trids);     %Get event matrix for all trials, all events between cur outcome and prev outcome, 3d numeric
+[evmat,evmatfids]=getEvtMat(plotevents,trlist,eventcodes,'trialids',trids);     %Get event matrix for all trials
 
+%Get data trial by trial into a matrix array tbt_Data for the chosen trids
+rate=10;    %Default fscv sample rate = 10 Hz
+chnum=[];   %nlx ch
+tbt_Data=[];    %trial by trial data for fscv or nlx
+if strcmp(datavar,'fscv')
+    tbt_Data=vertcat(trlists.fscv{dach}(trids).da);
+        site=trlists.fscvsites(find(ismember([trlists.fscvsites.ch],dach)));
+        sitename=site.site;
+else
+    %nlx data
+    chnum=find(contains(trlists.nlxnames,nlxname));%Find ch to get nlx data based on specified name
+    tbt_Data=vertcat(trlists.nlx{chnum}{trids});%Convert cell to vertical double array, each row a trial
+    rate=round(getSampleRate(trlist(trids(1)).NlxTS));
+    if rem(rate,10)~=0
+        %If not divisible by 10, something wrong with rate calculation...
+        STOP;%Call debug function
+        error('rate calculation incorrect; not divisible by 10');
+    end
+    site=trlists.nlxsites(chnum);
+    sitename=site.site;
+end
 
-%Define plotting window in samples (based on sample rate), define uniform
-%time stamps for all trials
+%Define plotting window tbt_winSamps in samples (based on signal rate), define uniform
+%TSs for all selected trid trials. 
+% Also BG subtract FSCV data to aln evt
+%   Also get TS's (mapped to TS_plot and relative to eventaln) for all plotevents
+TS_plot=win(1):1/rate:win(2);%TS to plot in seconds, relative to alignment event
+winIDsRel=win(1)*rate:win(2)*rate;%Relative samples for plotting window relative to aln evt
+alnID=find(contains(plotevents,eventaln));  %ID for alignment event
+tbt_winSamps=[];
+tbt_evmatTSplot=[]; %Event time stamps relative to eventaln and TS_plot
+if strcmp(datavar,'fscv')
+    alnFsamps=evmatfids(:,alnID);    %FSCV ids for alignment event for each trial for trids
+    tbt_winFsamps=repmat(winIDsRel,length(trids),1)+alnFsamps;%Sample ids for each trial and window
+    tbt_winSamps=tbt_winFsamps;
+    %Get re-aligned TS's for marker plotting of events
+    evmatS_subaln=evmatfidsA-alnFsamps;  %Event TS samples - alignment TS samples, 3d array num
+    evmatTS_subaln=evmatS_subaln./rate;  %Event TS for all plotevents in TS_plot domain
+    tbt_evmatTSplot=evmatTS_subaln;
+    %Background subtract FSCV data
+    for it=1:size(tbt_Data,1)
+        bgwinids=alnFsamps(it)-bgwinSampSize:alnFsamps(it)-1;
+        bgwinids(bgwinids<1)=[];
+        bgwinids(bgwinids>size(tbt_Data,2))=[];
+        if isempty(bgwinids)
+            STOP;%Call debug function
+            error('bg ids beyond boundaries of data');
+        end
+        bgmean=nanmean(tbt_Data(it,bgwinids));        %Mean background signal around aln evt
+        tbt_Data(it,:)=tbt_Data(it,:)-bgmean;   %Subtract mean background signal
+    end
+else
+    %Nlx data
+    alnTSNlx=evmat(:,alnID);   %NLX ts's for aln event for each trial for trids
+    nlx_TSs=vertcat(trlist(trids).NlxTS);%All Nlx TS's for each selected trid trial
+    tbt_alnNlxSamps=findNearestTS(alnTSNlx,nlx_TSs,1/rate/2);%Find the nlx sample for each row of data that most closely matches provided alignment event  TS (Note difference comes from downsampling), 50% margin of error
+    tbt_winNlxSamps=repmat(winIDsRel,length(trids),1)+tbt_alnNlxSamps;%Sample ids for each trial and window for Nlx
+    tbt_winSamps=tbt_winNlxSamps;
+    %Get re-aligned TS's for marker plotting of events
+    evmatTS_subaln=evmatA-alnTSNlx;  %Event TS - alignment TS, 3d array numeric
+    tbt_evmatTSplot=evmatTS_subaln;     %Event TS for all plotevents in TS_plot domain
+end
 
+%Get plotting data just in defined window from tbt_Data
+tbt_winData=zeros(size(tbt_winSamps));
+for it=1:size(tbt_Data,1)
+    tbt_winData(it,:)=tbt_Data(it,tbt_winSamps(it,:));
+end
 
+%Process data if phys (e.g. lick, pulse, pupil)
+%%
 
- %more than one time point
-        imagetrials=image(axa{ip}, pdata,'cdatamapping','scaled');
-        set(axa{ip},'YDir','reverse')        %flip y-axis values so first trial on top
-        artTime=isnan(pdata);   %find artifact points (nan periods)
-        artTime=abs(artTime-1);         %make alpha data mask by inverting 1/0's
-        artTime2=artTime;
-        maskGray=artTime2==0;             %find Zero indices representing artifact mask
-        maskGray=maskGray*.15;            %make gray rather than white default by making non-zero
-        artTime=artTime+maskGray;
-        set(imagetrials, 'AlphaData', artTime);    
+%Plot raster trial by trial data tbt_winData and format
+%Display everything except aln evt
+marka=[];%Event names excluding aln evt
+tbt_selectevmatTS=[];%tbt_evmatTSplot excluding aln evt
+if ~isempty(plotevents)
+    marka=plotevents(~contains(plotevents,eventaln));       %Marker names except current aln evt
+    tbt_selectevmatTS=tbt_evmatTSplot(:,find(~contains(plotevents,eventaln)),:);
+end
+marka=plotevents; tbt_selectevmatTS=tbt_evmatTSplot; %DISPLAY EVERYTHING INCLUDING ALN EVT
+alltypes=[ttypes{:}];
+plotname=[signaltype ' | Site ' sitename ' | Session ' sessid char(10)...
+    'Conditions: ' [alltypes{:}] ' | 0 Aln: ' eventaln ' ' char(10)...
+    'Sort: ' sorttype];
+%Raster plotting function call
+axa{1}=plotTBTRaster(TS_plot,tbt_winData,'axes',axa{1},'title',plotname,...
+    'cscale',cscale,'markers',{marka,tbt_selectevmatTS});   
+
