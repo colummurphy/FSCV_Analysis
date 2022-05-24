@@ -1,6 +1,7 @@
-function [axa,trids,tbt_winData]=tr_raster(trlists,datavar,varargin)
+function [axa,trids,tbt_winData]=tr_raster(trlists,varargin)
 %User provides channel and data varaible to plot 
-% datavar = fscv or nlx (struct variable in trlists)
+% call for plotting FSCV DA ITI example: [axa,tridsP,dataP]=tr_raster(trlists,'da',2,'ttypes',{{'big','small'},{'post','break'}},'win',[-12,4],'event','display_fix');
+% for plotting Nlx lick: [~,tridsL,dataL]=tr_raster(trlists,'nlx','lick','ttypes',{{'big','small'},{'post','big'}},'win',[-12,4],'event','display_fix');
 %persistent trlists
 %Plot raster plots for sel chs and options
 fontsize=10;
@@ -38,18 +39,16 @@ sorttype='';        %Sort type
 argnum=1;
 while argnum<=length(varargin)
     switch varargin{argnum}   
-        case 'processed'
-            %Get "processed" data in trlists (specific field) (e.g. pulse)
-            argnum=argnum+1;
-            datavar=varargin{argnum};   %Field to open in trlists.processed
         case 'da'
             argnum=argnum+1;
             dach=varargin{argnum};     %Da chs to plot
-            signaltype='FSCV';
+            signaltype='fscv';
+            datavar='fscv';
         case 'nlx'
             argnum=argnum+1;
             nlxname=varargin{argnum};  %Nlx name (e.g. pulse, 'pl1-p5', etc.)
-            signaltype='Nlx';
+            signaltype='nlx';
+            datavar='nlx';
         case 'cscale'
             argnum=argnum+1;
             cscale=varargin{argnum};    %Cscale for clim 
@@ -113,8 +112,13 @@ trlist=trlists.trlist;
 
 %Get Trial #'s for plotting from trlists.trlist based on supplied ttypes
 %and signaltype
-trids=getTrialIDs(trlists,ttypes,signaltype,'dach',dach);
-
+trids=[];
+if strcmp(datavar,'fscv')
+    trids=getTrialIDs(trlists,ttypes,signaltype,'dach',dach);
+else
+    signaltype='nlx';
+    trids=getTrialIDs(trlists,ttypes,signaltype);
+end
 %Get plotting events and alignment of signals (TS's for each trial)
 %Since multiple trials in each trial data, need to get the events closest
 %and before trlist.ts (i.e. outcome ts)
@@ -145,7 +149,7 @@ end
 rate=10;    %Default fscv sample rate = 10 Hz
 chnum=[];   %nlx ch
 tbt_Data=[];    %trial by trial data for fscv or nlx
-if strcmp(datavar,'fscv')
+if strcmp(signaltype,'fscv')
     tbt_Data=vertcat(trlists.fscv{dach}(trids).da);
         site=trlists.fscvsites(find(ismember([trlists.fscvsites.ch],dach)));
         sitename=site.site;
@@ -172,7 +176,7 @@ winIDsRel=win(1)*rate:win(2)*rate;%Relative samples for plotting window relative
 alnID=find(contains(plotevents,eventaln));  %ID for alignment event
 tbt_winSamps=[];
 tbt_evmatTSplot=[]; %Event time stamps relative to eventaln and TS_plot
-if strcmp(datavar,'fscv')
+if strcmp(signaltype,'fscv')
     alnFsamps=evmatfids(:,alnID);    %FSCV ids for alignment event for each trial for trids
     tbt_winFsamps=repmat(winIDsRel,length(trids),1)+alnFsamps;%Sample ids for each trial and window
     tbt_winSamps=tbt_winFsamps;
@@ -204,14 +208,28 @@ else
     tbt_evmatTSplot=evmatTS_subaln;     %Event TS for all plotevents in TS_plot domain
 end
 
-%Get plotting data just in defined window from tbt_Data
+
+%Process data if phys (e.g. lick, pulse, pupil), before windowing
+if strcmp(signaltype,'nlx') && contains(nlxname,'lick')
+    %Lick low pass filter (as used at MIT) trial by trial, really does very
+    %little...may be remove.
+    ldata=[];
+    for it=1:size(tbt_Data,1)
+        ldata(it,:)=filterLFP(tbt_Data(it,:),rate,[0 100]);     %Low pass filter fc = 100 Hz for lick  --> Does very little
+        %datemp=smoothwin(datemp,0.1);   %Smoothing with Hanning function--> NOt sure how this ever worked for setTrialAx
+        tbt_Data(it,:)=ldata(it,:);
+    end
+end
+
+
+%Windowed plotting data just in defined window from original tbt_Data
 tbt_winData=zeros(size(tbt_winSamps));
 for it=1:size(tbt_Data,1)
     tbt_winData(it,:)=tbt_Data(it,tbt_winSamps(it,:));
 end
 
-%Process data if phys (e.g. lick, pulse, pupil)
-%%
+
+
 
 %Plot raster trial by trial data tbt_winData and format
 %Display everything except aln evt

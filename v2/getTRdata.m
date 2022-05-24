@@ -79,7 +79,7 @@ run([configdir 'patra_map_bipolar']);   %run patra_map_bipolar for ch settings
 %get paths{1} just use spreadsheet that has list of sessions recorded and
     %their directories, right now comes from chronicXXchconfig loaded above                                                     
 
-%run config file to get ncschannels & paths
+%run config file to get ncschannels & paths e.g. chronic83chconfigsimple.m
 homedirf=strfind(paths{1},'1dr');
 subjectdir=paths{1}(1:homedirf-1);
 manlist=[subjectdir 'chronic' sessid '_trialselection.xlsx'];      %list for manually selected bad trials
@@ -91,6 +91,21 @@ fscvpathtemp.bigreward=fullfile(paths{1}, 'matlab','bigreward_pro',filesep);
 fscvpathtemp.smallreward=fullfile(paths{1}, 'matlab','smallreward_pro',filesep);
 fscvpathtemp.targetbreak=fullfile(paths{1}, 'matlab','targetbreak_pro',filesep);
 fscvpathtemp.fixbreak=fullfile(paths{1}, 'matlab','fixbreak_pro',filesep);
+
+%Original analysis paths (with data analyzed from compiletrialsdir and
+%extractsession), mainly used to just get good trials, not for actual
+%analysis data, except trlist.mat
+rootOG=strfind(subjectdir,'patra_fscv');    %Get root index to re-index to analysis folder
+OGdir=subjectdir(1:rootOG-1);
+analysispathOG.home=fullfile(OGdir,'analysis',subjectname,['chronic' sessid],filesep);
+if ~isfolder(analysispathOG.home)
+   error([analysispathOG ' does not exist']);
+end
+analysispathOG.bigreward=fullfile(OGdir,'analysis',subjectname,['chronic' sessid],'bigreward',filesep);
+analysispathOG.smallreward=fullfile(OGdir,'analysis',subjectname,['chronic' sessid],'smallreward',filesep);
+analysispathOG.targetbreak=fullfile(OGdir,'analysis',subjectname,['chronic' sessid],'targetbreak',filesep);
+analysispathOG.fixbreak=fullfile(OGdir,'analysis',subjectname,['chronic' sessid],'fixbreak',filesep);
+
 
 %NEW PATHS in SEPARATE directory in home directory
 analysispath.home=fullfile(homedir,'analysis',subjectname,['chronic' sessid],filesep);
@@ -108,9 +123,6 @@ trialgroups=trialgroups(2:end);%rm home, only what trial conditions
 %Get Data Settings
 %Need to get parameters for recording, e.g. sampling rates, NLX CSC site
 %labels (e.g. putamen, CN, non-neural phys), etc.
-param={};
-csc_map={};
-eventcodes={};
 %Not sure if call to getparams REALLY needed, a lot of the code can be
 %simplified, most of getparams is for extractsession process
 %Merge getparams and getplotsettings and merge param and plotparam vars
@@ -126,8 +138,6 @@ plotparam.chnums=fscvchs;
 plotparam.ephysIDs=ephysIDs;
 
 %Also Modify - (remove) setup rates
-ratelfp=param.ratelfp;
-rates=[ceil(param.ratelfp) param.rateFSCV];
 plotparam.samplespersec=param.rateFSCV;   %fscv sample rate..
 
 %Shouldn't need this here - set up fscv temporal domain
@@ -159,7 +169,7 @@ plotparam.alnevt=alnevt;        %default alnevt (up above) = targeye
 %table to list all trials and store all the trial by trial da and ephys
 %data extracted below
 
-load([analysispath.home 'trlist.mat'],'trlist');  %load trlist from analysis path
+load([analysispathOG.home 'trlist.mat'],'trlist');  %load trlist from analysis path
 %going to incorporate measured data into this master trial list
 trlists.trlist=trlist;
 maxtrials=length(trlist);
@@ -198,7 +208,7 @@ goodtrials={};          %each cell refers to a condition
 ich=1;
 for itype=1:length(trialgroups) 
     display(['Current trial condition: ' trialgroups{itype}])
-    currpath=getfield(analysispath,trialgroups{itype});     %get data path
+    currpath=getfield(analysispathOG,trialgroups{itype});     %get data path
     plotparam.pathname=currpath;    %store data paths to read into analysis functions
     plotparam.trialtype=trialgroups{itype};
 

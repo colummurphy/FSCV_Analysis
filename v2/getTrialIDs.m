@@ -67,7 +67,7 @@ end
 
 
 %Retain only good/valid trials (no artifact) depending on signaltype
-if strcmp(signaltype,'FSCV')
+if strcmp(signaltype,'fscv')
     goodtrs=find([trlists.fscv{dach}.good]);
     trids=intersect(trids,goodtrs);%Good trials only
 else
