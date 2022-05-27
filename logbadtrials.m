@@ -3,7 +3,7 @@ function logbadtrials(subj,sess,trtype,trial,chs)
 %eg. logbadtrials(hgui.subject,hgui.sessionnum,hgui.trialtype,hgui.trialnum,1:4)
 %trialnum is the label of trial num eg. trial num 100 = trial 1
 %xlswrite(FILE,ARRAY,SHEET,RANGE) writes to the specified SHEET and RANGE.
-pathsave=fullfile('Z:', 'inj-monkey2', 'analysis', subj, 'triallogs', filesep);
+pathsave=fullfile('Y:', 'data_MIT', 'analysis', subj, 'triallogs', filesep);
 if ~isdir(pathsave)
     mkdir(pathsave);
 end

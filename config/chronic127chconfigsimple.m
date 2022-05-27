@@ -15,16 +15,15 @@ ncschannels={'p1-p3','p2-p3','p1-pl3','p3-pl3',...
     'cl1-cl3','cl1-cl4','cl3-cl4',...
     'cl4-cl5','cl1-cl5',...
     'eyex','eyed','lickx','pulse'};
-%get info on whether pc or some other system (ie. chunky) to determine dir
-pctype=computer;
-ispc=strcmpi(pctype,'pcwin64');
-homedir='Z:';
-if ~ispc
-    homedir=[filesep 'smbshare'];
-end
-graserver='inj-monkey2';
-fscvdir='patra_fscv2';
 
-paths{1}=fullfile(homedir,graserver,fscvdir,'patra_chronic127_08142018','1dr','cvtotxt',filesep);
-paths{2}=fullfile(homedir,graserver,'patra2','2018-08-14_09-52-42',filesep);
+%get info on whether pc or some other system (ie. chunky) to determine dir
+
+letterdrive='Y:';   %COPYHERE
+fscvdir='patra_fscv'; %COPYHERE
+
+paths{1}=fullfile(letterdrive,'data_MIT',fscvdir,'patra_chronic127_08142018','1dr','cvtotxt',filesep); %COPYHERE
+
+
+%paths{1}=fullfile(homedir,graserver,fscvdir,'patra_chronic127_08142018','1dr','cvtotxt',filesep);
+%paths{2}=fullfile(homedir,graserver,'patra2','2018-08-14_09-52-42',filesep);
 

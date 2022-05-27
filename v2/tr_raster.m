@@ -114,11 +114,16 @@ trlist=trlists.trlist;
 %and signaltype
 trids=[];
 if strcmp(datavar,'fscv')
-    trids=getTrialIDs(trlists,ttypes,signaltype,'dach',dach);
+   trids=getTrialIDs(trlists,ttypes,signaltype,'dach',dach);
+    %trids=getTrialIDs(trlists,ttypes,signaltype,'dach',dach,'ignoregood');%TESTING ONLY
+   
 else
     signaltype='nlx';
     trids=getTrialIDs(trlists,ttypes,signaltype);
+ %   trids=getTrialIDs(trlists,ttypes,signaltype,'ignoregood');;%TESTING ONLY
 end
+   % trids=trids(~ismember(trids,[964 965 966 967]));;%TESTING ONLY
+
 %Get plotting events and alignment of signals (TS's for each trial)
 %Since multiple trials in each trial data, need to get the events closest
 %and before trlist.ts (i.e. outcome ts)
@@ -174,11 +179,17 @@ end
 TS_plot=win(1):1/rate:win(2);%TS to plot in seconds, relative to alignment event
 winIDsRel=win(1)*rate:win(2)*rate;%Relative samples for plotting window relative to aln evt
 alnID=find(contains(plotevents,eventaln));  %ID for alignment event
-tbt_winSamps=[];
-tbt_evmatTSplot=[]; %Event time stamps relative to eventaln and TS_plot
+tbt_winSamps=[];%Sample points for each trial of data to plot for user defined window
+tbt_evmatTSplot=[]; %Event time stamps relative to eventaln and TS_plot for plotting markers
+%[tbt_winSamps,tbt_evmatTSplot]=getEvtAlnTBT()
 if strcmp(signaltype,'fscv')
     alnFsamps=evmatfids(:,alnID);    %FSCV ids for alignment event for each trial for trids
-    tbt_winFsamps=repmat(winIDsRel,length(trids),1)+alnFsamps;%Sample ids for each trial and window
+    if length(alnID)>1
+        %2 or more event IDs specified, choose the numeric or latest (max) one
+        alnFsamps2=max(alnFsamps,[],2);
+        alnFsamps=alnFsamps2;
+    end
+    tbt_winFsamps=repmat(winIDsRel,size(evmatfids,1),1)+alnFsamps;%Sample ids for each trial and window
     tbt_winSamps=tbt_winFsamps;
     %Get re-aligned TS's for marker plotting of events
     evmatS_subaln=evmatfidsA-alnFsamps;  %Event TS samples - alignment TS samples, 3d array num
@@ -199,9 +210,14 @@ if strcmp(signaltype,'fscv')
 else
     %Nlx data
     alnTSNlx=evmat(:,alnID);   %NLX ts's for aln event for each trial for trids
+    if length(alnID)>1
+        %2 or more event IDs specified, choose the numeric or latest (max) one
+        alnTSNlx2=max(alnTSNlx,[],2);
+        alnTSNlx=alnTSNlx2;
+    end
     nlx_TSs=vertcat(trlist(trids).NlxTS);%All Nlx TS's for each selected trid trial
     tbt_alnNlxSamps=findNearestTS(alnTSNlx,nlx_TSs,1/rate/2);%Find the nlx sample for each row of data that most closely matches provided alignment event  TS (Note difference comes from downsampling), 50% margin of error
-    tbt_winNlxSamps=repmat(winIDsRel,length(trids),1)+tbt_alnNlxSamps;%Sample ids for each trial and window for Nlx
+    tbt_winNlxSamps=repmat(winIDsRel,size(evmat,1),1)+tbt_alnNlxSamps;%Sample ids for each trial and window for Nlx
     tbt_winSamps=tbt_winNlxSamps;
     %Get re-aligned TS's for marker plotting of events
     evmatTS_subaln=evmatA-alnTSNlx;  %Event TS - alignment TS, 3d array numeric
@@ -213,12 +229,61 @@ end
 if strcmp(signaltype,'nlx') && contains(nlxname,'lick')
     %Lick low pass filter (as used at MIT) trial by trial, really does very
     %little...may be remove.
-    ldata=[];
+    ldata=tbt_Data; %Save original data;
     for it=1:size(tbt_Data,1)
-        ldata(it,:)=filterLFP(tbt_Data(it,:),rate,[0 100]);     %Low pass filter fc = 100 Hz for lick  --> Does very little
+        tbt_Data(it,:)=filterLFP(tbt_Data(it,:),rate,[0 100]);     %Low pass filter fc = 100 Hz for lick  --> Does very little
         %datemp=smoothwin(datemp,0.1);   %Smoothing with Hanning function--> NOt sure how this ever worked for setTrialAx
-        tbt_Data(it,:)=ldata(it,:);
     end
+end
+
+if strcmp(signaltype,'nlx') && contains(nlxname,'eyed')
+    %Pupil diameter, in original setTrialAx, appears that eyed was
+    %inverted..not done here yet.
+    %NaN any blinks in data otherwise artificially can increase diameter
+    ed_data=tbt_Data;
+    blink_thres=2.5e-3;%Absolute peak threshold to remove eye blinks (usually hits rail)
+    blink_pad=30;%Samples for padding around blink removal
+    for it=1:size(tbt_Data,1)
+       tbt_Data(it,:)=deglitchnanamp(tbt_Data(it,:),blink_thres,30);
+    end
+end
+
+if strcmp(signaltype,'nlx') && contains(nlxname,'eyex')
+    %Get pupil velocity from eye x traces (eye y not valid since task just
+    %calibrated for left/right mvmts in Cleo/Patra)
+    eyedist=[];
+    eyeusacs=[];
+    eyev=[];
+    blink_pad=30;
+    smoothlength=20;
+    eyex=tbt_Data;%Store original data;
+    meaneye=nanmean(tbt_Data,2);
+    meane=nanmean(meaneye);
+    stdeye=nanstd(tbt_Data,[],2);
+    meanstd=nanmean(stdeye);
+    threseye=abs(meane)+3*meanstd;%THreshold to remove blinks (not sure why different from eyed)
+    for itrial=1:size(tbt_Data,1)
+        %REMOVE BLINKS
+        tbt_Data(itrial,:)=deglitchnanamp(tbt_Data(itrial,:),threseye,30);  
+        smootheye=smoothwin(tbt_Data(itrial,:),smoothlength);
+        eyevel=diff(smootheye);   %Get eye velocity from differentiating x so = x/samps
+        eyevel(isnan(eyevel))=0;
+        abseyevel=abs(eyevel);
+        eyedisttemp=cumtrapz(abseyevel);%Get distance from integrating eye velocity, WHY?? JUst use x
+        thres=nanmean(abseyevel);
+        maxlim=nanstd(abseyevel);
+        [pks,locs,w,p] = findpeaks(abseyevel,'minpeakwidth',...
+            round(samplespersec*.01),'minpeakdistance',round(samplespersec*.05)...
+            ,'MinPeakprominence',thres);
+        sacslogic=zeros(1,length(datatemp));
+        locsbelowlim=locs(pks<=maxlim);
+        sacslogic(locsbelowlim)=1;
+        eyeusacs(itrial,:)=sacslogic;
+        eyedist(itrial,:)=eyedisttemp;
+        eyev(itrial,:)=eyevel;
+    end
+    tbt_data=eyevel;
+
 end
 
 
