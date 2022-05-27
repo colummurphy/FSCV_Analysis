@@ -13,12 +13,15 @@ function trids=getTrialIDs(trlists,ttypes,signaltype,varargin)
 
 
 dach=0;
+ignoregood=0; %ONLY FOR ETSTING
 argnum=1;
-while length(varargin)>argnum
+while length(varargin)>=argnum
     switch varargin{argnum}
         case 'dach'
             argnum=argnum+1;
             dach=varargin{argnum};
+        case 'ignoregood'
+            ignoregood=1;
     end
     argnum=argnum+1;
 end
@@ -67,6 +70,7 @@ end
 
 
 %Retain only good/valid trials (no artifact) depending on signaltype
+if ~ignoregood
 if strcmp(signaltype,'fscv')
     goodtrs=find([trlists.fscv{dach}.good]);
     trids=intersect(trids,goodtrs);%Good trials only
@@ -80,6 +84,7 @@ else
     goodtrs2=sum(goodtrslist);
     goodtrs=find(goodtrs2~=0);
     trids=intersect(trids,goodtrs);
+end
 end
 
 %Get target side condition, if provided as one of the types
