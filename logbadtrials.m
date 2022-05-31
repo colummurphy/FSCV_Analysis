@@ -1,5 +1,5 @@
 function logbadtrials(subj,sess,trtype,trial,chs)
-%write bad trials based on ch# etc. to excel sheet
+%write bad trials based on ch# etc. to excel sheet (TXT file)
 %eg. logbadtrials(hgui.subject,hgui.sessionnum,hgui.trialtype,hgui.trialnum,1:4)
 %trialnum is the label of trial num eg. trial num 100 = trial 1
 %xlswrite(FILE,ARRAY,SHEET,RANGE) writes to the specified SHEET and RANGE.
@@ -33,6 +33,5 @@ end
 fprintf(fileID,'%d\t %d \t%d \t%d\t\r\n',rowwrite);
 disp(['writing : ' num2str(rowwrite)]);
 fclose(fileID);
-
 
 end
