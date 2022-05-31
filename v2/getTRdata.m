@@ -82,7 +82,16 @@ run([configdir 'patra_map_bipolar']);   %run patra_map_bipolar for ch settings
 %run config file to get ncschannels & paths e.g. chronic83chconfigsimple.m
 homedirf=strfind(paths{1},'1dr');
 subjectdir=paths{1}(1:homedirf-1);
-manlist=[subjectdir 'chronic' sessid '_trialselection.xlsx'];      %list for manually selected bad trials
+manlist=[subjectdir 'chronic' sessid '_trialselection.xlsx'];      %list for manually selected bad trials (Original directory)
+%Check if manlist also exists in compiled triallogs from new buttonpress
+%logbadtrials savebadtrials scripts made ~2019
+rootOG=strfind(subjectdir,'patra_fscv');    %Get root index to re-index to analysis folder
+OGdir=subjectdir(1:rootOG-1);
+manlistdir2=fullfile(OGdir,'analysis',subjectname,'triallogs',filesep);
+manlist2=[manlistdir2 'chronic' sessid '_trialselection.xlsx'];
+if exist(manlist2,'file')
+    manlist=manlist2;
+end
 %assignin('base','fcnStatus',targpathtemp)   %store targpath in workspace
 manlistlfp=[subjectdir 'chronic' sessid 'l_trialselection.xlsx'];      %list for manually selected bad trials
 
@@ -95,8 +104,7 @@ fscvpathtemp.fixbreak=fullfile(paths{1}, 'matlab','fixbreak_pro',filesep);
 %Original analysis paths (with data analyzed from compiletrialsdir and
 %extractsession), mainly used to just get good trials, not for actual
 %analysis data, except trlist.mat
-rootOG=strfind(subjectdir,'patra_fscv');    %Get root index to re-index to analysis folder
-OGdir=subjectdir(1:rootOG-1);
+
 analysispathOG.home=fullfile(OGdir,'analysis',subjectname,['chronic' sessid],filesep);
 if ~isfolder(analysispathOG.home)
    error([analysispathOG ' does not exist']);
@@ -243,6 +251,7 @@ for itype=1:length(trialgroups)
 
     %remove trials manually if have task event timestamps that don't make
     %sense
+    if ~isempty(goodtrials{itype})
     if any(samplesfixeye{1}<100) || any(samplesfixeye{1}<samplesfix{1})
         %if time stampe for cue fixation is less than 100 samples (i.e.
         %before 10 s, then it must be invalid trial because the trial
@@ -262,6 +271,7 @@ for itype=1:length(trialgroups)
         goodtrials{itype}{iich}=goodtrials{itype}{iich}(find(~ismember(goodtrials{itype}{iich},chbadtrials2)));
         end
         warning([num2str(length(chbadtrials2)) ' target task events outside normal trial time range']);
+    end
     end
     
     %convert good trial nums for each channel from this task condition 
