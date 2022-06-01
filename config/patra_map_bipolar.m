@@ -4,7 +4,7 @@ PCR_srcdir='C:\Users\putamen\Documents\Matlab\fscv\analysis\pcr_templates\';
 %be 18, 19 or 45) especially because 18 or 19 usually comes before 45 when
 %it does appear [18 = reward start, 19= reward end, 45 = reward cue with
 %delay] see 1dr_helen_biased.c in cleo folder and encodes_helen.h
-PCR_srcdir=fullfile('C:','Users','putamen','Documents','MATLAB','fscv','analysis','pcr_templates');
+PCR_srcdir=fullfile('C:','Users','usamma','Desktop','Data_analysis','analysis','fscv','pcr_templates');
 PCR_srcdir=[PCR_srcdir filesep];
 PCR_template='patra_clean_mscaledred_da_ph_m_bg.mat';     %2/9/2019, scaled m Cts coeff to match second hump rather than domiannt m hump, reduced # of M components to > 16 to 9 or 10
 
