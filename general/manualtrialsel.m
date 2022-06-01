@@ -43,7 +43,7 @@ if exist(manlist)>0
        % chbadtrials=[final(1,:); final(2:size(final,1),:)-99];        %default, 100 first trial
        % CONDITIONAL IF A CHANNEL IS EMPTY MAKE chbad trials=alltrials
     end
-end
+end 
 
 for ch=1:4 %added these loops but i dont think this will work unless we remove/change lines 28, and 29 since that sets goodtrials=alltrials
     if sum(~isnan(final(:,ch)))==0 %finds entirely empty channels
