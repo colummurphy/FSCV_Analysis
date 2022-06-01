@@ -35,7 +35,7 @@ if exist(manlist)>0
                 channels{1,i}=4
             end
         end
-        final=str2double(string(channels(2:end,:)))-99;
+        final=str2double(string(channels(2:end,:)))-99;  
 
 
        %NEED TO CONVERT TO NUMBERS FOR EACH CHANNEL NOW
