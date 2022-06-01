@@ -11,8 +11,8 @@ if exist(manlist)>0
     [~,sheetsav] = xlsfinfo(manlist); %find # sheets in worksheet
     sheet=find(contains(sheetsav,type));
     if ~isempty(sheet)
-       % xlsdata = xlsread(manlist,sheet);
-       xlsdata=readtable(manlist,'Sheet',sheet);    %read xls as table (table format)
+       xlsdata = xlsread(manlist,sheet);
+       %xlsdata=readtable(manlist,'Sheet',sheet);    %read xls as table (table format)
        %NEED TO CONVERT TO NUMBERS FOR EACH CHANNEL NOW
        % chbadtrials=xlsdata-100;        % 101 first trial
         chbadtrials=xlsdata-99;        %default, 100 first trial
