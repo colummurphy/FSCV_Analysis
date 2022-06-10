@@ -48,7 +48,7 @@ for ch=1:4
     if final==0; %added this
         chbadtrials(:,ch)=alltrials; %added this
         goodtrials{ch}=[]; %added this
-    elseif sum(~isnan(final(:,ch)))==0
+    elseif sum(~isnan(final(:,ch)))==0 % adding comment to allow for commit
         chbadtrials(:,ch)=alltrials;
         goodtrials{ch}=[]
     else 
