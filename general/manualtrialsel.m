@@ -1,4 +1,5 @@
 function goodtrials=manualtrialsel(manlist,ich,alltrials,type)
+%JWC / USA made changes 06/01/2022 to look at headers for channnel #s
 %05/2022 updated so that it looks at actual column #'s nto just where
 %columns are populated, which could be inaccurate esepcially if no ch1
 %numbers
