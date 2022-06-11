@@ -16,6 +16,12 @@ ncschannels={'p1','p2','p1-p2','p3','p1-p3','p2-p3','pl3',...
 pctype=computer;
 ispc=strcmpi(pctype,'pcwin64');
 homedir='Z:';               %CHANGE HERE
+if ~exist('graserver')
+    %get original values from MIT < 2021, otherwise declared from parent
+    graserver='inj-monkey2';
+    fscvdir='patra_fscv2';
+    patra_ephys='patra2';
+end
 
 paths{1}=fullfile(homedir,graserver,fscvdir,'patra_chronic127_08142018','1dr','cvtotxt',filesep);
 paths{2}=fullfile(homedir,graserver,patra_ephys,'2018-08-14_09-52-42',filesep);
