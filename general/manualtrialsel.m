@@ -8,6 +8,7 @@ function goodtrials=manualtrialsel(manlist,ich,alltrials,type)
 %use targeted ich for selecting column
 %must be saved in original data location
 chbadtrials=[];
+final=[];
 if exist(manlist)>0
     [~,sheetsav] = xlsfinfo(manlist); %find # sheets in worksheet
     sheet=find(contains(sheetsav,type));
@@ -37,44 +38,22 @@ if exist(manlist)>0
             end
         end
         final=str2double(string(channels(2:end,:)))-99;   
-
-
-       %NEED TO CONVERT TO NUMBERS FOR EACH CHANNEL NOW
-       % chbadtrials=xlsdata-100;        % 101 first trial
-%         chbadtrials=[final(1,:); final(2:size(final,1),:)-99];        %default, 100 first trial
-        %CONDITIONAL IF A CHANNEL IS EMPTY MAKE chbad trials=alltrials
     end
 end
 
-for ch=1:4 %added these loops but i dont think this will work unless we remove/change lines 28, and 29 since that sets goodtrials=alltrials
-    if sum(~isnan(final(:,ch)))==0
+names=sheetnames(manlist); %added this
+if sum(contains(names,type))==0; %added this
+    final=0; %added this
+end; %added this
+for ch=1:4 
+    if final==0; %added this
+        chbadtrials(:,ch)=alltrials; %added this
+        goodtrials{ch}=[]; %added this
+    elseif sum(~isnan(final(:,ch)))==0 % adding comment to allow for commit
         chbadtrials(:,ch)=alltrials;
-        goodtrials{ch}=[];
+        goodtrials{ch}=[]
     else 
         goodtrials{ch}=alltrials(~ismember(alltrials,final(:,ch)));
     end
 end
-
-% badtrials=zeros(size(final,1),size(final,2));
-% for i = 1:size(final,1)
-%     for j = 1:size(final,2)
-%         if isnan(final(i,j))
-%             badtrials(i,j)=alltrials(i,j);
-%         end
-%     end
-% end
-
-% goodtrials=alltrials;         %default, all trials goodtrials
-% goodtrials={};
-% for ich=1:4
-%     %add 5/2019 all channels, not just #2
-%     if ~isempty(chbadtrials)        
-%         %use manual selected trials
-%         if size(chbadtrials,2)>1
-%             goodtrials{ich}=alltrials(find(~ismember(alltrials,chbadtrials(:,ich))));
-%         else
-%             %only single ch in excel sheet
-%             goodtrials{ich}=alltrials(find(~ismember(alltrials,chbadtrials)));
-%         end        
-%     end
-% end
+%change

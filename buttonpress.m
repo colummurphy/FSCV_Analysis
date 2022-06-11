@@ -32,7 +32,10 @@ switch button
         end
         hgui.FileName=hgui.dirIndex(hgui.currentIndex).name; 
         namx=strfind(hgui.FileName,'.mat');
+        %namx=erase(hgui.FileName,"_cvtotxt");
+        %idex=length(namx);
         if ~isempty(namx)
+            %hgui.trialnum=namx(1,idex-2:idex)
             hgui.trialnum=hgui.FileName(namx-3:namx-1);
         else
             hgui.trialnum=[];
