@@ -55,27 +55,3 @@ for ch=1:4
         goodtrials{ch}=alltrials(~ismember(alltrials,final(:,ch)));
     end
 end
-
-% badtrials=zeros(size(final,1),size(final,2));
-% for i = 1:size(final,1)
-%     for j = 1:size(final,2)
-%         if isnan(final(i,j))
-%             badtrials(i,j)=alltrials(i,j);
-%         end
-%     end
-% end
-
-% goodtrials=alltrials;         %default, all trials goodtrials
-% goodtrials={};
-% for ich=1:4
-%     %add 5/2019 all channels, not just #2
-%     if ~isempty(chbadtrials)        
-%         %use manual selected trials
-%         if size(chbadtrials,2)>1
-%             goodtrials{ich}=alltrials(find(~ismember(alltrials,chbadtrials(:,ich))));
-%         else
-%             %only single ch in excel sheet
-%             goodtrials{ich}=alltrials(find(~ismember(alltrials,chbadtrials)));
-%         end        
-%     end
-% end
