@@ -55,3 +55,4 @@ for ch=1:4
         goodtrials{ch}=alltrials(~ismember(alltrials,final(:,ch)));
     end
 end
+%change
