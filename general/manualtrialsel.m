@@ -14,6 +14,7 @@ if exist(manlist)>0
     [~,sheetsav] = xlsfinfo(manlist); %find # sheets in worksheet
     sheet=find(contains(sheetsav,type));
     if ~isempty(sheet)
+
        xlsdata=readcell(manlist);    %read xls as table (table format)
         channels={};
         for i= 1:size(xlsdata,2)
