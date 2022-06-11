@@ -1,4 +1,6 @@
 function goodtrials=manualtrialsel(manlist,ich,alltrials,type)
+%line by line comments need to be added, what is final?
+%JWC / USA made changes 06/01/2022 to look at headers for channnel #s
 %05/2022 updated so that it looks at actual column #'s nto just where
 %columns are populated, which could be inaccurate esepcially if no ch1
 %numbers
@@ -7,30 +9,51 @@ function goodtrials=manualtrialsel(manlist,ich,alltrials,type)
 %use targeted ich for selecting column
 %must be saved in original data location
 chbadtrials=[];
+final=[];
 if exist(manlist)>0
     [~,sheetsav] = xlsfinfo(manlist); %find # sheets in worksheet
     sheet=find(contains(sheetsav,type));
     if ~isempty(sheet)
-       xlsdata = xlsread(manlist,sheet);
-       %xlsdata=readtable(manlist,'Sheet',sheet);    %read xls as table (table format)
-       %NEED TO CONVERT TO NUMBERS FOR EACH CHANNEL NOW
-       % chbadtrials=xlsdata-100;        % 101 first trial
-        chbadtrials=xlsdata-99;        %default, 100 first trial
-        %CONDITIONAL IF A CHANNEL IS EMPTY MAKE chbad trials=alltrials
+
+       xlsdata=readcell(manlist);    %read xls as table (table format)
+        channels={};
+        for i= 1:size(xlsdata,2)
+            if ischar(xlsdata{1,i})==0
+                break
+            end
+            if contains(xlsdata{1,i}, 'Ch') || contains(xlsdata{1,i}, 'ch')
+                channels=[channels, xlsdata(:,i)];
+            end
+        end
+    
+        for i= 1:size(channels,2)
+            if contains(channels{1,i}, '1')
+                channels{1,i}=1;
+            elseif contains(channels{1,i}, '2')
+                channels{1,i}=2;
+            elseif contains(channels{1,i}, '3')
+                channels{1,i}=3;
+            elseif contains(channels{1,i}, '4')
+                channels{1,i}=4;
+            end
+        end
+        final=str2double(string(channels(2:end,:)))-99;   
     end
 end
-goodtrials=alltrials;         %default, all trials goodtrials
-goodtrials={};
-for ich=1:4
-    %add 5/2019 all channels, not just #2
-if ~isempty(chbadtrials)        
-    %use manual selected trials
-    if size(chbadtrials,2)>1
-        goodtrials{ich}=alltrials(find(~ismember(alltrials,chbadtrials(:,ich))));
-    else
-        %only single ch in excel sheet
-        goodtrials{ich}=alltrials(find(~ismember(alltrials,chbadtrials)));
-    end        
+
+names=sheetnames(manlist); %added this
+if sum(contains(names,type))==0 %added this
+    final=0; %added this
+end %added this
+for ch=1:4 
+    if final==0 %added this
+        chbadtrials(:,ch)=alltrials; %added this
+        goodtrials{ch}=[]; %added this
+    elseif sum(~isnan(final(:,ch)))==0 % adding comment to allow for commit
+        chbadtrials(:,ch)=alltrials;
+        goodtrials{ch}=[];
+    else 
+        goodtrials{ch}=alltrials(~ismember(alltrials,final(:,ch)));
+    end
 end
-end
-end
+%change
