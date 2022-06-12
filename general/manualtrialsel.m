@@ -15,18 +15,18 @@ if exist(manlist)>0
     sheet=find(contains(sheetsav,type));
     if ~isempty(sheet)
 
-       xlsdata=readcell(manlist);    %read xls as table (table format)
+       xlsdata=readcell(manlist);    %read xls in cell format
         channels={};
         for i= 1:size(xlsdata,2)
-            if ischar(xlsdata{1,i})==0
+            if ischar(xlsdata{1,i})==0 % Once the for loop gets to a column header with no words the loop exits, since notes is always one column away it catches the four channels
                 break
             end
-            if contains(xlsdata{1,i}, 'Ch') || contains(xlsdata{1,i}, 'ch')
+            if contains(xlsdata{1,i}, 'Ch') || contains(xlsdata{1,i}, 'ch') %only captures columns with channel in the header
                 channels=[channels, xlsdata(:,i)];
             end
         end
     
-        for i= 1:size(channels,2)
+        for i= 1:size(channels,2) % converts the trial header from words to numeric
             if contains(channels{1,i}, '1')
                 channels{1,i}=1;
             elseif contains(channels{1,i}, '2')
@@ -37,23 +37,22 @@ if exist(manlist)>0
                 channels{1,i}=4;
             end
         end
-        final=str2double(string(channels(2:end,:)))-99;   
+        final=str2double(string(channels(2:end,:)))-99;   %final is the channel output in matrix output to itterate in the following loops. 
     end
 end
 
-names=sheetnames(manlist); %added this
-if sum(contains(names,type))==0 %added this
-    final=0; %added this
-end %added this
+names=sheetnames(manlist); %saves a variable with the names of all the sheets in the xls doc
+if sum(contains(names,type))==0 %if the type isnt in the sheet names set the final matrix output to 0
+    final=0; 
+end 
 for ch=1:4 
-    if final==0 %added this
-        chbadtrials(:,ch)=alltrials; %added this
-        goodtrials{ch}=[]; %added this
-    elseif sum(~isnan(final(:,ch)))==0 % adding comment to allow for commit
+    if final==0 %makes all trials bad for sheets not in the xls doc
+        chbadtrials(:,ch)=alltrials; 
+        goodtrials{ch}=[]; 
+    elseif sum(~isnan(final(:,ch)))==0  %if all the columns are empty then make all the channels bad channels
         chbadtrials(:,ch)=alltrials;
         goodtrials{ch}=[];
-    else 
+    else  %if the matrix has filled columns make them good trials for a given channel. 
         goodtrials{ch}=alltrials(~ismember(alltrials,final(:,ch)));
     end
 end
-%change
