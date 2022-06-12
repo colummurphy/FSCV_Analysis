@@ -33,11 +33,12 @@ close(gcf)
 
 %%
 %Plot mean quartiles
-qtr=round(length(tridsT)*.25);
-datameanqtr1=nanmean(dataT(1:qtr,:),1);
-datameanqtr4=nanmean(dataT(end-qtr:end,:),1);
-datase1=nanstd(dataT(1:qtr,:),0,1)./sqrt(qtr);
-datase4=nanstd(dataT(end-qtr:end,:),0,1)./sqrt(qtr);
+qtr1=round(length(tridsT)*.25);
+datameanqtr1=nanmean(dataT(1:qtr1,:),1);
+datameanqtr4=nanmean(dataT(end-qtr1:end,:),1);
+datase1=nanstd(dataT(1:qtr1,:),0,1)./sqrt(qtr1);
+datase4=nanstd(dataT(end-qtr1:end,:),0,1)./sqrt(qtr1);
+
 
 fmeans=figure('color',[1 1 1]); 
 set(0,'CurrentFigure',fmeans);    %set figure handle to current figure
