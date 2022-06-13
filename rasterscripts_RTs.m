@@ -3,7 +3,7 @@
 %Quickly plot rasters and mean traces for each session according to
 %conditions defined in call to tr_raster
 
-sessnum=92; %CHANGE HERE
+sessnum=69; %CHANGE HERE
 %analyzeSes(sessnum,'fscvchs',[2 4],'nlxch',{'eyex','eyed','pulse','lickx'})
 numtargetbreaktrials=length(find(contains({trlists.trlist.type},'targetbreak')));
 numalltrials=length(trlists.trlist);
@@ -13,7 +13,7 @@ percentfixbreak=numfixbreaktrials/numalltrials*100
 tridsT=[];
 tridsF=[];
 tridsR=[];
-for chnum=[2 4] %CHANGE HERE
+for chnum=[1 4] %CHANGE HERE
 %chnum=2;%Change here to look at different sites for given session
 sitename=trlists.fscvsites(find([trlists.fscvsites.ch]==chnum)).site;%Get sitename from list
 time=[-12,4];%time to extract relative to alignment event, .e.g display_fix
@@ -33,11 +33,12 @@ close(gcf)
 
 %%
 %Plot mean quartiles
-qtr=round(length(tridsT)*.25);
-datameanqtr1=nanmean(dataT(1:qtr,:),1);
-datameanqtr4=nanmean(dataT(end-qtr:end,:),1);
-datase1=nanstd(dataT(1:qtr,:),0,1)./sqrt(qtr);
-datase4=nanstd(dataT(end-qtr:end,:),0,1)./sqrt(qtr);
+qtr1=round(length(tridsT)*.25);
+datameanqtr1=nanmean(dataT(1:qtr1,:),1);
+datameanqtr4=nanmean(dataT(end-qtr1:end,:),1);
+datase1=nanstd(dataT(1:qtr1,:),0,1)./sqrt(qtr1);
+datase4=nanstd(dataT(end-qtr1:end,:),0,1)./sqrt(qtr1);
+
 
 fmeans=figure('color',[1 1 1]); 
 set(0,'CurrentFigure',fmeans);    %set figure handle to current figure
