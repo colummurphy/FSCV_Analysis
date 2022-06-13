@@ -3,7 +3,7 @@
 %Quickly plot rasters and mean traces for each session according to
 %conditions defined in call to tr_raster
 
-sessnum=92; %CHANGE HERE
+sessnum=69; %CHANGE HERE
 %analyzeSes(sessnum,'fscvchs',[2 4],'nlxch',{'eyex','eyed','pulse','lickx'})
 numtargetbreaktrials=length(find(contains({trlists.trlist.type},'targetbreak')));
 numalltrials=length(trlists.trlist);
@@ -13,7 +13,7 @@ percentfixbreak=numfixbreaktrials/numalltrials*100
 tridsT=[];
 tridsF=[];
 tridsR=[];
-for chnum=[2 4] %CHANGE HERE
+for chnum=[1 4] %CHANGE HERE
 %chnum=2;%Change here to look at different sites for given session
 sitename=trlists.fscvsites(find([trlists.fscvsites.ch]==chnum)).site;%Get sitename from list
 time=[-12,4];%time to extract relative to alignment event, .e.g display_fix
