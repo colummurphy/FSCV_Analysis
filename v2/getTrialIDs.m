@@ -36,7 +36,7 @@ trids=sort(trids);
 
 side=[];    %Target side condition
 preTypes={};%Trial types preceding current trial
-numtypes=2;
+numtypes=1;
 while length(ttypes)>=numtypes
     if ~iscell(ttypes{numtypes})
         %Just string provided, e.g. 'left' or 'right'
@@ -51,10 +51,12 @@ while length(ttypes)>=numtypes
     else
         %It is a cell containing multiple strings, e.g.
         %{'post','reward'}
-        if any(contains(ttypes{numtypes},'left'))
+        if any(contains(ttypes{numtypes},'left')) && ~any(contains(ttypes{numtypes},'post'))
+            %For current trials only (not previous, 'post' condition not in
+            %the same bracketed argument
             side=0; %Leftside trials
         end
-          if any(contains(ttypes{numtypes},'right'))
+        if any(contains(ttypes{numtypes},'right')) && ~any(contains(ttypes{numtypes},'post'))
             side=1; %Leftside trials
         end      
         if any(contains(ttypes{numtypes},'post'))
@@ -96,10 +98,20 @@ if ~isempty(preTypes)
     seltrids=[];
     trids2=trids;
     for n=1:length(preTypes)
-        pretrids=trids-n;
+        pretrids=trids-1;   %previous trial (1 back)
         pretrids=pretrids(pretrids>0 & pretrids<length(trlists.trlist));
         pretypes={trlists.trlist(pretrids).type};   %Find nth previous trial type
         pretypeids=find(contains(pretypes,preTypes{n}));    %Get pretrids #
+        if contains(preTypes{n},'left') || contains(preTypes{n},'right')
+            %Side type not in trlist.type, need to check trlist.side for
+            %this type of type
+            side=0; %Leftside trials
+            if contains(preTypes{n},'right')
+                side=1; %Rightside trials
+            end  
+           pretypes=[trlists.trlist(pretrids).side];   %Find nth previous trial type
+           pretypeids=find(pretypes==side);
+        end
         seltrids=pretrids(pretypeids);  %Get pretrids for those containing indicated pre-trial event at nth pretrial 
         seltrids=seltrids+n;    %Get actual trid for current trial post the pre-trial event
         seltrids=intersect(seltrids,trids);%Only get trids that intersect with current good list--THIS SHOULD STAY SAME since preselected from trids list.

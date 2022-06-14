@@ -1,4 +1,4 @@
-function [evmat,evmatfids,evmatfscv,evmatfscvnlx] = getEvtMatAllNumeric(plotevents,trlist,eventcodes,varargin)
+function [evmat,evmatfids,evmatfscv,evmatfscvnlx] = getEvtMatAllNum(plotevents,trlist,eventcodes,varargin)
 %05/2022
 %Same as getEvtMatAll, except use 3d numeric array so can do numeric
 %operations

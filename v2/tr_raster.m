@@ -1,9 +1,12 @@
-function [axa,trids,tbt_winData]=tr_raster(trlists,varargin)
+function [axa,trids,tbt_winData,tbt_selectevmatTS]=tr_raster(trlists,varargin)
 %User provides channel and data varaible to plot 
 % call for plotting FSCV DA ITI example: [axa,tridsP,dataP]=tr_raster(trlists,'da',2,'ttypes',{{'big','small'},{'post','break'}},'win',[-12,4],'event','display_fix');
 % for plotting Nlx lick: [~,tridsL,dataL]=tr_raster(trlists,'nlx','lick','ttypes',{{'big','small'},{'post','big'}},'win',[-12,4],'event','display_fix');
 %persistent trlists
 %Plot raster plots for sel chs and options
+%incllude output for timestamps for events relative to alignemnt event HNS
+%06/12/2022
+
 fontsize=10;
 figpos=[50,50,700,900];
 numplots=1;
@@ -29,7 +32,7 @@ sortwin={'targ','outcome'};
 win=[-2 6];     %Plot window
 plotz=0;
 ttypes={'big','left'};        %Condition types first arg must be main condition (big, small, targetbreak,fixbreak), the rest can be target side (left or right) {'big','left'} 
-plotevents={'display_fix','display_target','reward_big','reward_small','break_target','break_fix'};%events to plot with markers if present in trial
+plotevents={'display_fix','display_target','start_target','reward_big','reward_small','break_target','break_fix'};%events to plot with markers if present in trial
 pEvtSize=15;    %Marker size for events
 pEvtColors=cool(length(plotevents)-1);  %Plot markers colors
 cscale=[];  %Color scale
@@ -251,8 +254,8 @@ end
 if strcmp(signaltype,'nlx') && contains(nlxname,'eyex')
     %Get pupil velocity from eye x traces (eye y not valid since task just
     %calibrated for left/right mvmts in Cleo/Patra)
-    eyedist=[];
-    eyeusacs=[];
+    %eyedist=[];
+   % eyeusacs=[];
     eyev=[];
     blink_pad=30;
     smoothlength=20;
@@ -264,26 +267,27 @@ if strcmp(signaltype,'nlx') && contains(nlxname,'eyex')
     threseye=abs(meane)+3*meanstd;%THreshold to remove blinks (not sure why different from eyed)
     for itrial=1:size(tbt_Data,1)
         %REMOVE BLINKS
-        tbt_Data(itrial,:)=deglitchnanamp(tbt_Data(itrial,:),threseye,30);  
+        tbt_Data(itrial,:)=deglitchnanamp(tbt_Data(itrial,:),threseye,30); %Produce nan at blinks and large/fast transients 
         smootheye=smoothwin(tbt_Data(itrial,:),smoothlength);
         eyevel=diff(smootheye);   %Get eye velocity from differentiating x so = x/samps
-        eyevel(isnan(eyevel))=0;
-        abseyevel=abs(eyevel);
-        eyedisttemp=cumtrapz(abseyevel);%Get distance from integrating eye velocity, WHY?? JUst use x
-        thres=nanmean(abseyevel);
-        maxlim=nanstd(abseyevel);
-        [pks,locs,w,p] = findpeaks(abseyevel,'minpeakwidth',...
-            round(samplespersec*.01),'minpeakdistance',round(samplespersec*.05)...
-            ,'MinPeakprominence',thres);
-        sacslogic=zeros(1,length(datatemp));
-        locsbelowlim=locs(pks<=maxlim);
-        sacslogic(locsbelowlim)=1;
-        eyeusacs(itrial,:)=sacslogic;
-        eyedist(itrial,:)=eyedisttemp;
+       % eyevel(isnan(eyevel))=0;
+        %abseyevel=abs(eyevel);
+        %eyedisttemp=cumtrapz(abseyevel);%Get distance from integrating eye velocity, WHY?? JUst use x
+       % thres=nanmean(abseyevel);
+     %   maxlim=nanstd(abseyevel);
+      %  [pks,locs,w,p] = findpeaks(abseyevel,'minpeakwidth',...
+      %      round(samplespersec*.01),'minpeakdistance',round(samplespersec*.05)...
+      %      ,'MinPeakprominence',thres);
+      %  sacslogic=zeros(1,length(datatemp));
+      %  locsbelowlim=locs(pks<=maxlim);
+       % sacslogic(locsbelowlim)=1;
+       % eyeusacs(itrial,:)=sacslogic;
+       % eyedist(itrial,:)=eyedisttemp;
         eyev(itrial,:)=eyevel;
     end
-    tbt_data=eyevel;
-
+    tbt_Data=eyev;
+    %HAVE TO ADD NAN TO LAST COLUMN TO MAINTAIN SAME AMOUNT OF DATA POINTS!
+    
 end
 
 
