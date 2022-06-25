@@ -252,7 +252,7 @@ if strcmp(signaltype,'nlx') && contains(nlxname,'eyed')
 end
 
 if strcmp(signaltype,'nlx') && contains(nlxname,'eyex')
-    %Get pupil velocity from eye x traces (eye y not valid since task just
+       %Get pupil velocity from eye x traces (eye y not valid since task just
     %calibrated for left/right mvmts in Cleo/Patra)
     %eyedist=[];
    % eyeusacs=[];
@@ -285,7 +285,7 @@ if strcmp(signaltype,'nlx') && contains(nlxname,'eyex')
        % eyedist(itrial,:)=eyedisttemp;
         eyev(itrial,:)=eyevel;
     end
-    tbt_Data=eyev;
+    tbt_Data=eyex;
     %HAVE TO ADD NAN TO LAST COLUMN TO MAINTAIN SAME AMOUNT OF DATA POINTS!
     
 end
