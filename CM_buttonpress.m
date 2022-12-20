@@ -62,7 +62,7 @@ switch key
         end
 
         % Returns vector of indexes, each index - location of '/' 
-        namy=strfind(hgui.PathName,'/');
+        namy=strfind(hgui.PathName, ("/"|"\"));
         
         % Return index of chronic
         s1=strfind(hgui.PathName,'chronic');
