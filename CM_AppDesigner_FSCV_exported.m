@@ -3,6 +3,8 @@ classdef CM_AppDesigner_FSCV_exported < matlab.apps.AppBase
     % Properties that correspond to app components
     properties (Access = public)
         UIFigure      matlab.ui.Figure
+        Menu          matlab.ui.container.Menu
+        LoadMenu      matlab.ui.container.Menu
         ColorCheck4   matlab.ui.control.CheckBox
         ColorCheck3   matlab.ui.control.CheckBox
         ColorCheck2   matlab.ui.control.CheckBox
@@ -182,6 +184,16 @@ classdef CM_AppDesigner_FSCV_exported < matlab.apps.AppBase
                         app.DopaminePlot);
 
         end
+
+        % Menu selected function: LoadMenu
+        function LoadMenuSelected(app, event)
+           
+            appDesColorPlots = [app.ColorPlot1, app.ColorPlot2, ... 
+                                    app.ColorPlot3, app.ColorPlot4];
+            
+            CM_menuselect(appDesColorPlots, app.DopaminePlot, app.TitleText);
+            
+        end
     end
 
     % Component initialization
@@ -197,6 +209,15 @@ classdef CM_AppDesigner_FSCV_exported < matlab.apps.AppBase
             app.UIFigure.WindowButtonDownFcn = createCallbackFcn(app, @UIFigureWindowButtonDown, true);
             app.UIFigure.WindowKeyPressFcn = createCallbackFcn(app, @UIFigureWindowKeyPress, true);
 
+            % Create Menu
+            app.Menu = uimenu(app.UIFigure);
+            app.Menu.Text = 'Menu';
+
+            % Create LoadMenu
+            app.LoadMenu = uimenu(app.Menu);
+            app.LoadMenu.MenuSelectedFcn = createCallbackFcn(app, @LoadMenuSelected, true);
+            app.LoadMenu.Text = 'Load';
+
             % Create ColorPlot1
             app.ColorPlot1 = uiaxes(app.UIFigure);
             ylabel(app.ColorPlot1, 'Voltage (V)')
@@ -207,7 +228,7 @@ classdef CM_AppDesigner_FSCV_exported < matlab.apps.AppBase
             app.ColorPlot1.XTickLabel = '';
             app.ColorPlot1.YTick = [];
             app.ColorPlot1.Tag = 'ColorPlot1';
-            app.ColorPlot1.Position = [90 544 750 130];
+            app.ColorPlot1.Position = [90 539 750 128];
 
             % Create ColorPlot2
             app.ColorPlot2 = uiaxes(app.UIFigure);
@@ -219,7 +240,7 @@ classdef CM_AppDesigner_FSCV_exported < matlab.apps.AppBase
             app.ColorPlot2.XTickLabel = '';
             app.ColorPlot2.YTick = [];
             app.ColorPlot2.Tag = 'ColorPlot2';
-            app.ColorPlot2.Position = [90 410 750 130];
+            app.ColorPlot2.Position = [90 406 750 128];
 
             % Create ColorPlot3
             app.ColorPlot3 = uiaxes(app.UIFigure);
@@ -231,7 +252,7 @@ classdef CM_AppDesigner_FSCV_exported < matlab.apps.AppBase
             app.ColorPlot3.XTickLabel = '';
             app.ColorPlot3.YTick = [];
             app.ColorPlot3.Tag = 'ColorPlot3';
-            app.ColorPlot3.Position = [90 276 750 130];
+            app.ColorPlot3.Position = [90 273 750 128];
 
             % Create ColorPlot4
             app.ColorPlot4 = uiaxes(app.UIFigure);
@@ -243,7 +264,7 @@ classdef CM_AppDesigner_FSCV_exported < matlab.apps.AppBase
             app.ColorPlot4.XTickLabel = '';
             app.ColorPlot4.YTick = [];
             app.ColorPlot4.Tag = 'ColorPlot4';
-            app.ColorPlot4.Position = [90 142 750 130];
+            app.ColorPlot4.Position = [90 140 750 128];
 
             % Create DopaminePlot
             app.DopaminePlot = uiaxes(app.UIFigure);
@@ -280,25 +301,25 @@ classdef CM_AppDesigner_FSCV_exported < matlab.apps.AppBase
             app.ColorCheck1 = uicheckbox(app.UIFigure);
             app.ColorCheck1.ValueChangedFcn = createCallbackFcn(app, @ColorCheck1ValueChanged, true);
             app.ColorCheck1.Text = 'Plot1';
-            app.ColorCheck1.Position = [20 598 50 22];
+            app.ColorCheck1.Position = [20 584 50 22];
 
             % Create ColorCheck2
             app.ColorCheck2 = uicheckbox(app.UIFigure);
             app.ColorCheck2.ValueChangedFcn = createCallbackFcn(app, @ColorCheck2ValueChanged, true);
             app.ColorCheck2.Text = 'Plot2';
-            app.ColorCheck2.Position = [20 464 50 22];
+            app.ColorCheck2.Position = [20 454 50 22];
 
             % Create ColorCheck3
             app.ColorCheck3 = uicheckbox(app.UIFigure);
             app.ColorCheck3.ValueChangedFcn = createCallbackFcn(app, @ColorCheck3ValueChanged, true);
             app.ColorCheck3.Text = 'Plot3';
-            app.ColorCheck3.Position = [20 330 50 22];
+            app.ColorCheck3.Position = [20 325 50 22];
 
             % Create ColorCheck4
             app.ColorCheck4 = uicheckbox(app.UIFigure);
             app.ColorCheck4.ValueChangedFcn = createCallbackFcn(app, @ColorCheck4ValueChanged, true);
             app.ColorCheck4.Text = 'Plot4';
-            app.ColorCheck4.Position = [20 196 50 22];
+            app.ColorCheck4.Position = [20 194 50 22];
 
             % Show the figure after all components are created
             app.UIFigure.Visible = 'on';
